@@ -86,7 +86,7 @@
 
     textarea {
       resize: vertical;
-      min-height: 80px;
+      min-height: 70px;
       font-family: inherit;
     }
 
@@ -106,6 +106,7 @@
     .btn-excel { background: var(--excel); color: #ffffff; }
     .btn-excel:hover { background: #15803d; }
     .btn-danger { background: var(--danger); color: #fff; }
+    .btn-edit { background: var(--gold); color: #0f172a; padding: 4px 8px; font-size: 12px; width: auto; }
 
     .form-inline { display: flex; gap: 8px; }
 
@@ -175,11 +176,12 @@
     .match-header {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       color: var(--text-muted);
       font-size: 13px;
       margin-bottom: 8px;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 4px;
+      padding-bottom: 6px;
     }
 
     .match-body {
@@ -210,6 +212,23 @@
       border: 1px solid var(--border);
     }
 
+    .audio-player {
+      width: 100%;
+      margin-top: 8px;
+      border-radius: 8px;
+    }
+
+    .audio-recorder-box {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
     .captain-select-group {
       margin-top: 10px;
       margin-bottom: 10px;
@@ -217,6 +236,29 @@
       padding: 8px;
       border-radius: 6px;
       border: 1px dashed var(--border);
+    }
+
+    /* Modal de Edição */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 12px;
+    }
+
+    .modal-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -303,12 +345,21 @@
       </div>
     </div>
 
-    <!-- Foto e História do Jogo -->
+    <!-- Foto, História e Áudio (Facultativos) -->
     <div style="margin-top: 16px;">
-      <label style="font-size: 12px; color: var(--text-muted);">📷 Foto dos Vencedores / Jogo:</label>
+      <label style="font-size: 12px; color: var(--text-muted);">📷 Foto dos Vencedores (Opcional):</label>
       <input type="file" id="matchPhoto" accept="image/*" style="margin-top: 4px; margin-bottom: 12px;">
 
-      <label style="font-size: 12px; color: var(--text-muted);">📝 História / Comentário do Jogo:</label>
+      <label style="font-size: 12px; color: var(--text-muted);">🎙️ Comentário por Voz / Áudio (Opcional):</label>
+      <div class="audio-recorder-box">
+        <div style="display:flex; gap:8px;">
+          <button id="btnStartRec" type="button" onclick="startRecording('main')" style="background:#3b82f6; color:#fff;">🔴 Gravar Voz</button>
+          <button id="btnStopRec" type="button" onclick="stopRecording('main')" style="background:var(--danger); color:#fff; display:none;">⏹️ Parar</button>
+        </div>
+        <audio id="audioPreviewMain" controls style="display:none; width:100%; margin-top:4px;"></audio>
+      </div>
+
+      <label style="font-size: 12px; color: var(--text-muted);">📝 História / Comentário Escrito (Opcional):</label>
       <textarea id="matchStory" placeholder="Escreve aqui o resumo do jogo, os momentos marcantes..."></textarea>
     </div>
 
@@ -325,7 +376,6 @@
 
   <!-- Tabelas de Prémios -->
   <div class="grid-awards">
-    
     <!-- Bola de Ouro -->
     <div class="card">
       <h2 style="color: #f59e0b;">🏆 Bola de Ouro (Pontuação)</h2>
@@ -367,7 +417,6 @@
         </table>
       </div>
     </div>
-
   </div>
 
   <!-- Histórico de Jogos -->
@@ -377,17 +426,105 @@
   </div>
 </div>
 
+<!-- Modal de Edição de Jogo -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <h2>✏️ Editar Informações do Jogo</h2>
+    <input type="hidden" id="editMatchId">
+    
+    <label style="font-size: 12px; color: var(--text-muted);">📝 Comentário Escrito:</label>
+    <textarea id="editStory" style="margin-bottom:12px;"></textarea>
+
+    <label style="font-size: 12px; color: var(--text-muted);">🎙️ Novo Áudio / Comentário por Voz:</label>
+    <div class="audio-recorder-box">
+      <div style="display:flex; gap:8px;">
+        <button id="btnStartRecEdit" type="button" onclick="startRecording('edit')" style="background:#3b82f6; color:#fff;">🔴 Gravar Novo Áudio</button>
+        <button id="btnStopRecEdit" type="button" onclick="stopRecording('edit')" style="background:var(--danger); color:#fff; display:none;">⏹️ Parar</button>
+      </div>
+      <audio id="audioPreviewEdit" controls style="display:none; width:100%; margin-top:4px;"></audio>
+    </div>
+
+    <label style="font-size: 12px; color: var(--text-muted);">📷 Substituir Foto:</label>
+    <input type="file" id="editPhoto" accept="image/*" style="margin-bottom:16px;">
+
+    <div style="display:flex; gap:8px;">
+      <button onclick="saveEditMatch()" style="background:var(--accent);">Guardar Alterações</button>
+      <button onclick="closeEditModal()" class="btn-danger">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let players = JSON.parse(localStorage.getItem('futsal_players')) || [];
   let matches = JSON.parse(localStorage.getItem('futsal_matches')) || [];
   let teamA = [];
   let teamB = [];
 
+  let mediaRecorder;
+  let audioChunks = [];
+  let currentAudioBase64Main = "";
+  let currentAudioBase64Edit = "";
+
   document.getElementById('matchDate').valueAsDate = new Date();
 
   function saveStorage() {
     localStorage.setItem('futsal_players', JSON.stringify(players));
     localStorage.setItem('futsal_matches', JSON.stringify(matches));
+  }
+
+  /* Gravador de Áudio */
+  async function startRecording(target) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          if (target === 'main') {
+            currentAudioBase64Main = reader.result;
+            const preview = document.getElementById('audioPreviewMain');
+            preview.src = currentAudioBase64Main;
+            preview.style.display = 'block';
+          } else {
+            currentAudioBase64Edit = reader.result;
+            const preview = document.getElementById('audioPreviewEdit');
+            preview.src = currentAudioBase64Edit;
+            preview.style.display = 'block';
+          }
+        };
+      };
+
+      mediaRecorder.start();
+
+      if (target === 'main') {
+        document.getElementById('btnStartRec').style.display = 'none';
+        document.getElementById('btnStopRec').style.display = 'inline-block';
+      } else {
+        document.getElementById('btnStartRecEdit').style.display = 'none';
+        document.getElementById('btnStopRecEdit').style.display = 'inline-block';
+      }
+    } catch (err) {
+      alert("Permissão de microfone negada ou não suportada no navegador.");
+    }
+  }
+
+  function stopRecording(target) {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      if (target === 'main') {
+        document.getElementById('btnStartRec').style.display = 'inline-block';
+        document.getElementById('btnStopRec').style.display = 'none';
+      } else {
+        document.getElementById('btnStartRecEdit').style.display = 'inline-block';
+        document.getElementById('btnStopRecEdit').style.display = 'none';
+      }
+    }
   }
 
   function addPlayer() {
@@ -506,237 +643,4 @@
     const scoreA = Number(document.getElementById('scoreA').value);
     const scoreB = Number(document.getElementById('scoreB').value);
     const matchDate = document.getElementById('matchDate').value;
-    const matchTime = document.getElementById('matchTime').value;
-    const matchLocation = document.getElementById('matchLocation').value.trim() || 'Não especificado';
-    const captainAId = Number(document.getElementById('captainA').value);
-    const captainBId = Number(document.getElementById('captainB').value);
-    const story = document.getElementById('matchStory').value.trim();
-    const photoInput = document.getElementById('matchPhoto');
-    const errorMsg = document.getElementById('errorMsg');
-
-    errorMsg.style.display = 'none';
-
-    if (!matchDate) {
-      errorMsg.innerText = "Erro: Por favor indica a data do jogo.";
-      errorMsg.style.display = 'block';
-      return;
-    }
-
-    if (teamA.length === 0 || teamB.length === 0) {
-      errorMsg.innerText = "Erro: Seleciona os jogadores para ambas as equipas.";
-      errorMsg.style.display = 'block';
-      return;
-    }
-
-    if (!captainAId) {
-      errorMsg.innerText = "Erro: Por favor seleciona o Capitão da Equipa A.";
-      errorMsg.style.display = 'block';
-      return;
-    }
-
-    if (!captainBId) {
-      errorMsg.innerText = "Erro: Por favor seleciona o Capitão da Equipa B.";
-      errorMsg.style.display = 'block';
-      return;
-    }
-
-    const totalGoalsA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
-    const totalGoalsB = teamB.reduce((sum, p) => sum + p.matchGoals, 0);
-
-    if (totalGoalsA !== scoreA) {
-      errorMsg.innerText = `Erro na Equipa A: A soma dos golos dos jogadores (${totalGoalsA}) não bate certo com o resultado (${scoreA}).`;
-      errorMsg.style.display = 'block';
-      return;
-    }
-
-    if (totalGoalsB !== scoreB) {
-      errorMsg.innerText = `Erro na Equipa B: A soma dos golos dos jogadores (${totalGoalsB}) não bate certo com o resultado (${scoreB}).`;
-      errorMsg.style.display = 'block';
-      return;
-    }
-
-    // Processar fotografia
-    let photoBase64 = "";
-    if (photoInput.files && photoInput.files[0]) {
-      photoBase64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(photoInput.files[0]);
-      });
-    }
-
-    let pointsA = 1, pointsB = 1;
-    let resA = 'loss', resB = 'loss';
-
-    if (scoreA > scoreB) {
-      pointsA = 4; pointsB = 1;
-      resA = 'win'; resB = 'loss';
-    } else if (scoreB > scoreA) {
-      pointsA = 1; pointsB = 4;
-      resA = 'loss'; resB = 'win';
-    } else {
-      pointsA = 2; pointsB = 2;
-      resA = 'draw'; resB = 'draw';
-    }
-
-    const capAObj = teamA.find(p => p.id === captainAId);
-    const capBObj = teamB.find(p => p.id === captainBId);
-
-    matches.unshift({
-      id: Date.now(),
-      date: matchDate,
-      time: matchTime,
-      location: matchLocation,
-      scoreA: scoreA,
-      scoreB: scoreB,
-      captainA: capAObj ? capAObj.name : '',
-      captainB: capBObj ? capBObj.name : '',
-      story: story,
-      photo: photoBase64,
-      teamA: teamA.map(p => ({ name: p.name, goals: p.matchGoals, isCaptain: p.id === captainAId })),
-      teamB: teamB.map(p => ({ name: p.name, goals: p.matchGoals, isCaptain: p.id === captainBId }))
-    });
-
-    players.forEach(p => {
-      const inA = teamA.find(item => item.id === p.id);
-      const inB = teamB.find(item => item.id === p.id);
-
-      if (inA) {
-        p.points += pointsA;
-        p.goals += inA.matchGoals;
-        p.played += 1;
-        if (resA === 'win') p.wins++;
-        if (resA === 'draw') p.draws++;
-        if (resA === 'loss') p.losses++;
-      } else if (inB) {
-        p.points += pointsB;
-        p.goals += inB.matchGoals;
-        p.played += 1;
-        if (resB === 'win') p.wins++;
-        if (resB === 'draw') p.draws++;
-        if (resB === 'loss') p.losses++;
-      }
-    });
-
-    teamA = [];
-    teamB = [];
-    document.getElementById('scoreA').value = 0;
-    document.getElementById('scoreB').value = 0;
-    document.getElementById('captainA').value = '';
-    document.getElementById('captainB').value = '';
-    document.getElementById('matchStory').value = '';
-    document.getElementById('matchPhoto').value = '';
-
-    saveStorage();
-    render();
-    alert("Jogo registado com sucesso!");
-  }
-
-  function renderLeaderboards() {
-    const tbodyBola = document.getElementById('leaderboardBolaOuro');
-    const sortedBola = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
-
-    tbodyBola.innerHTML = sortedBola.map((p, index) => `
-      <tr>
-        <td><strong>${index + 1}º</strong></td>
-        <td><strong>${p.name}</strong></td>
-        <td style="color: var(--gold); font-weight: bold;">${p.points}</td>
-        <td>${p.played}</td>
-        <td>${p.wins}</td>
-        <td>${p.draws}</td>
-        <td>${p.losses}</td>
-      </tr>
-    `).join('');
-
-    const tbodyBota = document.getElementById('leaderboardBotaOuro');
-    const sortedBota = [...players].sort((a, b) => b.goals - a.goals || b.points - a.points);
-
-    tbodyBota.innerHTML = sortedBota.map((p, index) => {
-      const avg = p.played > 0 ? (p.goals / p.played).toFixed(1) : '0.0';
-      return `
-        <tr>
-          <td><strong>${index + 1}º</strong></td>
-          <td><strong>${p.name}</strong></td>
-          <td style="color: var(--accent); font-weight: bold;">${p.goals}</td>
-          <td>${p.played}</td>
-          <td style="color: var(--text-muted);">${avg}</td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  function renderHistory() {
-    const historyList = document.getElementById('historyList');
-    if (matches.length === 0) {
-      historyList.innerHTML = `<span style="color:var(--text-muted); font-size:13px;">Nenhum jogo registado ainda.</span>`;
-      return;
-    }
-
-    historyList.innerHTML = matches.map(m => `
-      <div class="match-history-card">
-        <div class="match-header">
-          <span>📅 ${m.date} às ${m.time}</span>
-          <span>📍 ${m.location}</span>
-        </div>
-        <div class="match-body">
-          <span style="color: #60a5fa;">Equipa A (${m.scoreA}) <small style="color: var(--gold);">(Cap. ${m.captainA})</small></span>
-          <span>vs</span>
-          <span style="color: #f87171;">Equipa B (${m.scoreB}) <small style="color: var(--gold);">(Cap. ${m.captainB})</small></span>
-        </div>
-        ${m.story ? `<div class="match-story">"${m.story}"</div>` : ''}
-        ${m.photo ? `<img src="${m.photo}" class="match-photo" alt="Foto do jogo">` : ''}
-      </div>
-    `).join('');
-  }
-
-  function exportToExcel() {
-    if (players.length === 0) {
-      alert("Ainda não existem dados para exportar.");
-      return;
-    }
-
-    const sorted = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
-
-    const data = sorted.map((p, idx) => ({
-      "Posição Bola de Ouro": `${idx + 1}º`,
-      "Jogador": p.name,
-      "Pontos": p.points,
-      "Golos Marcados": p.goals,
-      "Jogos Realizados": p.played,
-      "Vitórias": p.wins,
-      "Empates": p.draws,
-      "Derrotas": p.losses
-    }));
-
-    if (window.XLSX) {
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Classificação");
-      XLSX.writeFile(wb, "Classificacao_Futsal_Quinta.xlsx");
-    }
-  }
-
-  function resetData() {
-    if (confirm("Tem a certeza que deseja apagar todos os registos e histórico?")) {
-      players = [];
-      matches = [];
-      teamA = [];
-      teamB = [];
-      saveStorage();
-      render();
-    }
-  }
-
-  function render() {
-    renderSelects();
-    renderTeamLists();
-    renderLeaderboards();
-    renderHistory();
-  }
-
-  render();
-</script>
-
-</body>
-</html>
-
+    const matchT
