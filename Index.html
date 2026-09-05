@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Jogos - Futsal Quinta-Feira</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --danger: #ef4444;
+      --excel: #16a34a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 12px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    h1 { font-size: 1.5rem; margin: 0 0 4px 0; color: #fff; }
+    h2 { font-size: 1.15rem; margin: 0 0 12px 0; color: #38bdf8; }
+    h3 { font-size: 1rem; margin: 0 0 8px 0; }
+    
+    .card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .grid-teams {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .grid-teams { grid-template-columns: 1fr; }
+      body { padding: 8px; }
+      .card { padding: 12px; }
+    }
+
+    input, select, button {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    input:focus, select:focus { outline: 2px solid var(--accent); }
+
+    button {
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: var(--accent-hover); }
+
+    .btn-excel { background: var(--excel); color: #ffffff; }
+    .btn-excel:hover { background: #15803d; }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    .form-inline { display: flex; gap: 8px; }
+
+    .player-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .player-row-controls { display: flex; align-items: center; gap: 8px; }
+    .player-row input[type="number"] { width: 65px; text-align: center; }
+
+    .score-inputs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .score-inputs input {
+      width: 60px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .table-wrapper { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+
+    .error-msg {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 500;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .action-buttons { display: flex; gap: 8px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <div class="header-actions">
+    <div>
+      <h1>Futsal Quinta-Feira</h1>
+      <span style="color: var(--text-muted); font-size: 13px;">Registo de Jogos & Classificação Geral</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>1. Gestão de Jogadores</h2>
+    <div class="form-inline">
+      <input type="text" id="playerName" placeholder="Nome do Jogador">
+      <button onclick="addPlayer()" style="width: auto; padding: 10px 20px;">Adicionar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Registar Novo Jogo</h2>
+    
+    <div class="score-inputs">
+      <span>Equipa A</span>
+      <input type="number" id="scoreA" value="0" min="0">
+      <span>vs</span>
+      <input type="number" id="scoreB" value="0" min="0">
+      <span>Equipa B</span>
+    </div>
+
+    <div class="grid-teams">
+      <div>
+        <h3 style="color: #60a5fa;">Equipa A</h3>
+        <select id="selectA" onchange="addPlayerToTeam('A')">
+          <option value="">+ Adicionar Jogador</option>
+        </select>
+        <div id="listA"></div>
+      </div>
+
+      <div>
+        <h3 style="color: #f87171;">Equipa B</h3>
+        <select id="selectB" onchange="addPlayerToTeam('B')">
+          <option value="">+ Adicionar Jogador</option>
+        </select>
+        <div id="listB"></div>
+      </div>
+    </div>
+
+    <div id="errorMsg" class="error-msg"></div>
+    <br>
+    <button onclick="saveMatch()" style="padding: 12px; font-size: 15px;">Gravar Jogo e Atribuir Pontos</button>
+  </div>
+
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+      <h2>3. Classificação Geral</h2>
+      <div class="action-buttons">
+        <button onclick="exportToExcel()" class="btn-excel">📥 Exportar para Excel (.xlsx)</button>
+        <button onclick="resetData()" class="btn-danger" style="font-size: 12px; padding: 6px 10px; width: auto;">Limpar Dados</button>
+      </div>
+    </div>
+    
+    <div class="table-wrapper">
+      <table id="leaderboardTable">
+        <thead>
+          <tr>
+            <th>Pos</th>
+            <th>Jogador</th>
+            <th>Pontos</th>
+            <th>Golos</th>
+            <th>Jogos</th>
+            <th>Vitórias</th>
+            <th>Empates</th>
+            <th>Derrotas</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  let players = JSON.parse(localStorage.getItem('futsal_players')) || [];
+  let teamA = [];
+  let teamB = [];
+
+  function saveStorage() {
+    localStorage.setItem('futsal_players', JSON.stringify(players));
+  }
+
+  function addPlayer() {
+    const nameInput = document.getElementById('playerName');
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      alert("Este jogador já se encontra registado!");
+      return;
+    }
+
+    players.push({
+      id: Date.now(),
+      name: name,
+      points: 0,
+      goals: 0,
+      played: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0
+    });
+
+    nameInput.value = '';
+    saveStorage();
+    render();
+  }
+
+  function renderSelects() {
+    const selectA = document.getElementById('selectA');
+    const selectB = document.getElementById('selectB');
+
+    selectA.innerHTML = '<option value="">+ Adicionar Jogador</option>';
+    selectB.innerHTML = '<option value="">+ Adicionar Jogador</option>';
+
+    players.forEach(p => {
+      const inA = teamA.some(t => t.id === p.id);
+      const inB = teamB.some(t => t.id === p.id);
+
+      if (!inA && !inB) {
+        selectA.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+        selectB.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      }
+    });
+  }
+
+  function addPlayerToTeam(team) {
+    const select = document.getElementById(team === 'A' ? 'selectA' : 'selectB');
+    const playerId = Number(select.value);
+    if (!playerId) return;
+
+    const player = players.find(p => p.id === playerId);
+    if (team === 'A') teamA.push({ ...player, matchGoals: 0 });
+    if (team === 'B') teamB.push({ ...player, matchGoals: 0 });
+
+    renderTeamLists();
+    renderSelects();
+  }
+
+  function removePlayerFromTeam(team, id) {
+    if (team === 'A') teamA = teamA.filter(p => p.id !== id);
+    if (team === 'B') teamB = teamB.filter(p => p.id !== id);
+    renderTeamLists();
+    renderSelects();
+  }
+
+  function updateGoals(team, id, goals) {
+    const list = team === 'A' ? teamA : teamB;
+    const player = list.find(p => p.id === id);
+    if (player) player.matchGoals = Number(goals);
+  }
+
+  function renderTeamLists() {
+    const listA = document.getElementById('listA');
+    const listB = document.getElementById('listB');
+
+    listA.innerHTML = teamA.map(p => `
+      <div class="player-row">
+        <span>${p.name}</span>
+        <div class="player-row-controls">
+          <label style="font-size:12px; color:var(--text-muted);">Golos:</label>
+          <input type="number" min="0" value="${p.matchGoals}" onchange="updateGoals('A', ${p.id}, this.value)">
+          <button onclick="removePlayerFromTeam('A', ${p.id})" class="btn-danger" style="width: auto; padding: 4px 8px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    listB.innerHTML = teamB.map(p => `
+      <div class="player-row">
+        <span>${p.name}</span>
+        <div class="player-row-controls">
+          <label style="font-size:12px; color:var(--text-muted);">Golos:</label>
+          <input type="number" min="0" value="${p.matchGoals}" onchange="updateGoals('B', ${p.id}, this.value)">
+          <button onclick="removePlayerFromTeam('B', ${p.id})" class="btn-danger" style="width: auto; padding: 4px 8px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function saveMatch() {
+    const scoreA = Number(document.getElementById('scoreA').value);
+    const scoreB = Number(document.getElementById('scoreB').value);
+    const errorMsg = document.getElementById('errorMsg');
+
+    errorMsg.style.display = 'none';
+
+    // Validação dos golos
+    const totalGoalsA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
+    const totalGoalsB = teamB.reduce((sum, p) => sum + p.matchGoals, 0);
+
+    if (teamA.length === 0 || teamB.length === 0) {
+      errorMsg.innerText = "Erro: Seleciona pelo menos um jogador para cada equipa.";
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    if (totalGoalsA !== scoreA) {
+      errorMsg.innerText = `Erro na Equipa A: A soma dos golos dos jogadores (${totalGoalsA}) não bate certo com o resultado final (${scoreA}).`;
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    if (totalGoalsB !== scoreB) {
+      errorMsg.innerText = `Erro na Equipa B: A soma dos golos dos jogadores (${totalGoalsB}) não bate certo com o resultado final (${scoreB}).`;
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    // Regras de pontuação: Vitória = 4, Empate = 2, Derrota = 1
+    let pointsA = 1, pointsB = 1;
+    let resA = 'loss', resB = 'loss';
+
+    if (scoreA > scoreB) {
+      pointsA = 4; pointsB = 1;
+      resA = 'win'; resB = 'loss';
+    } else if (scoreB > scoreA) {
+      pointsA = 1; pointsB = 4;
+      resA = 'loss'; resB = 'win';
+    } else {
+      pointsA = 2; pointsB = 2;
+      resA = 'draw'; resB = 'draw';
+    }
+
+    // Atualizar base de dados
+    players.forEach(p => {
+      const inA = teamA.find(item => item.id === p.id);
+      const inB = teamB.find(item => item.id === p.id);
+
+      if (inA) {
+        p.points += pointsA;
+        p.goals += inA.matchGoals;
+        p.played += 1;
+        if (resA === 'win') p.wins++;
+        if (resA === 'draw') p.draws++;
+        if (resA === 'loss') p.losses++;
+      } else if (inB) {
+        p.points += pointsB;
+        p.goals += inB.matchGoals;
+        p.played += 1;
+        if (resB === 'win') p.wins++;
+        if (resB === 'draw') p.draws++;
+        if (resB === 'loss') p.losses++;
+      }
+      // Se não jogou, atribui +0 pontos
+    });
+
+    // Limpar seleções
+    teamA = [];
+    teamB = [];
+    document.getElementById('scoreA').value = 0;
+    document.getElementById('scoreB').value = 0;
+
+    saveStorage();
+    render();
+    alert("Jogo gravado com sucesso!");
+  }
+
+  function renderLeaderboard() {
+    const leaderboard = document.getElementById('leaderboard');
+    // Ordenar por Pontos (descendente) e depois por Golos (descendente)
+    const sorted = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
+
+    leaderboard.innerHTML = sorted.map((p, index) => `
+      <tr>
+        <td><strong>${index + 1}º</strong></td>
+        <td><strong>${p.name}</strong></td>
+        <td style="color: var(--accent); font-weight: bold;">${p.points}</td>
+        <td>${p.goals}</td>
+        <td>${p.played}</td>
+        <td>${p.wins}</td>
+        <td>${p.draws}</td>
+        <td>${p.losses}</td>
+      </tr>
+    `).join('');
+  }
+
+  function exportToExcel() {
+    if (players.length === 0) {
+      alert("Ainda não existem dados de jogadores para exportar.");
+      return;
+    }
+
+    const sorted = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
+
+    const data = sorted.map((p, idx) => ({
+      "Posição": `${idx + 1}º`,
+      "Jogador": p.name,
+      "Pontos Total": p.points,
+      "Golos Marcados": p.goals,
+      "Jogos Realizados": p.played,
+      "Vitórias (4 pts)": p.wins,
+      "Empates (2 pts)": p.draws,
+      "Derrotas (1 pt)": p.losses
+    }));
+
+    if (window.XLSX) {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Classificação");
+      XLSX.writeFile(wb, "Classificacao_Futsal_Quinta.xlsx");
+    } else {
+      // Fallback para formato CSV formatado para Excel
+      let csv = "\uFEFFPosição;Jogador;Pontos Total;Golos Marcados;Jogos Realizados;Vitórias;Empates;Derrotas\n";
+      data.forEach(d => {
+        csv += `${d["Posição"]};${d["Jogador"]};${d["Pontos Total"]};${d["Golos Marcados"]};${d["Jogos Realizados"]};${d["Vitórias (4 pts)"]};${d["Empates (2 pts)"]};${d["Derrotas (1 pt)"]}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", "Classificacao_Futsal_Quinta.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+
+  function resetData() {
+    if (confirm("Tem a certeza que deseja apagar todos os registos? Esta ação não pode ser desfeita.")) {
+      players = [];
+      teamA = [];
+      teamB = [];
+      saveStorage();
+      render();
+    }
+  }
+
+  function render() {
+    renderSelects();
+    renderTeamLists();
+    renderLeaderboard();
+  }
+
+  // Inicialização
+  render();
+</script>
+
+</body>
+</html>
