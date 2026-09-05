@@ -15,6 +15,7 @@
       --border: #334155;
       --danger: #ef4444;
       --excel: #16a34a;
+      --gold: #f59e0b;
     }
 
     * { box-sizing: border-box; }
@@ -35,6 +36,628 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }
+
+    h1 { font-size: 1.5rem; margin: 0 0 4px 0; color: #fff; }
+    h2 { font-size: 1.15rem; margin: 0 0 12px 0; color: #38bdf8; }
+    h3 { font-size: 1rem; margin: 0 0 8px 0; }
+    
+    .card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .grid-teams {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .grid-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .grid-awards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .grid-teams, .grid-details, .grid-awards { grid-template-columns: 1fr; }
+      body { padding: 8px; }
+      .card { padding: 12px; }
+    }
+
+    input, select, textarea, button {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+      font-family: inherit;
+    }
+
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); }
+
+    button {
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: var(--accent-hover); }
+
+    .btn-excel { background: var(--excel); color: #ffffff; }
+    .btn-excel:hover { background: #15803d; }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    .form-inline { display: flex; gap: 8px; }
+
+    .player-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .player-row-controls { display: flex; align-items: center; gap: 8px; }
+    .player-row input[type="number"] { width: 65px; text-align: center; }
+
+    .score-inputs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .score-inputs input {
+      width: 60px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .table-wrapper { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+
+    .error-msg {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 500;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .match-history-card {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .match-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    .match-body {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .match-story {
+      background: #1e293b;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #cbd5e1;
+      font-style: italic;
+      margin-top: 8px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .match-photo {
+      width: 100%;
+      max-height: 350px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .captain-select-group {
+      margin-top: 10px;
+      margin-bottom: 10px;
+      background: #0f172a;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px dashed var(--border);
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <div>
+    <h1>Futsal Quinta-Feira</h1>
+    <span style="color: var(--text-muted); font-size: 13px;">Registo de Jogos & Prémios Época</span>
+  </div>
+
+  <!-- Adicionar Jogadores -->
+  <div class="card">
+    <h2>1. Gestão de Jogadores</h2>
+    <div class="form-inline">
+      <input type="text" id="playerName" placeholder="Nome do Jogador">
+      <button onclick="addPlayer()" style="width: auto; padding: 10px 20px;">Adicionar</button>
+    </div>
+  </div>
+
+  <!-- Registar Jogo -->
+  <div class="card">
+    <h2>2. Registar Jogo</h2>
+    
+    <!-- Detalhes do Jogo -->
+    <div class="grid-details">
+      <div>
+        <label style="font-size: 12px; color: var(--text-muted);">Data do Jogo:</label>
+        <input type="date" id="matchDate">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--text-muted);">Hora:</label>
+        <input type="time" id="matchTime" value="21:00">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--text-muted);">Pavilhão / Localização:</label>
+        <input type="text" id="matchLocation" placeholder="Ex: Pavilhão Municipal">
+      </div>
+    </div>
+
+    <!-- Resultado -->
+    <div class="score-inputs">
+      <span>Equipa A</span>
+      <input type="number" id="scoreA" value="0" min="0">
+      <span>vs</span>
+      <input type="number" id="scoreB" value="0" min="0">
+      <span>Equipa B</span>
+    </div>
+
+    <div class="grid-teams">
+      <!-- Equipa A -->
+      <div>
+        <h3 style="color: #60a5fa;">Equipa A</h3>
+        <select id="selectA" onchange="addPlayerToTeam('A')">
+          <option value="">+ Adicionar Jogador</option>
+        </select>
+        
+        <div class="captain-select-group">
+          <label style="font-size: 11px; color: var(--gold); font-weight: bold;">👑 Capitão Equipa A:</label>
+          <select id="captainA">
+            <option value="">-- Selecionar Capitão --</option>
+          </select>
+        </div>
+
+        <div id="listA"></div>
+      </div>
+
+      <!-- Equipa B -->
+      <div>
+        <h3 style="color: #f87171;">Equipa B</h3>
+        <select id="selectB" onchange="addPlayerToTeam('B')">
+          <option value="">+ Adicionar Jogador</option>
+        </select>
+
+        <div class="captain-select-group">
+          <label style="font-size: 11px; color: var(--gold); font-weight: bold;">👑 Capitão Equipa B:</label>
+          <select id="captainB">
+            <option value="">-- Selecionar Capitão --</option>
+          </select>
+        </div>
+
+        <div id="listB"></div>
+      </div>
+    </div>
+
+    <!-- Foto e História do Jogo -->
+    <div style="margin-top: 16px;">
+      <label style="font-size: 12px; color: var(--text-muted);">📷 Foto dos Vencedores / Jogo:</label>
+      <input type="file" id="matchPhoto" accept="image/*" style="margin-top: 4px; margin-bottom: 12px;">
+
+      <label style="font-size: 12px; color: var(--text-muted);">📝 História / Comentário do Jogo:</label>
+      <textarea id="matchStory" placeholder="Escreve aqui o resumo do jogo, os momentos marcantes..."></textarea>
+    </div>
+
+    <div id="errorMsg" class="error-msg"></div>
+    <br>
+    <button onclick="saveMatch()" style="padding: 12px; font-size: 15px;">Gravar Jogo e Atribuir Pontos</button>
+  </div>
+
+  <!-- Ações Globais -->
+  <div style="display: flex; justify-content: flex-end; gap: 8px;">
+    <button onclick="exportToExcel()" class="btn-excel" style="width: auto;">📥 Exportar Excel (.xlsx)</button>
+    <button onclick="resetData()" class="btn-danger" style="font-size: 12px; padding: 6px 10px; width: auto;">Limpar Tudo</button>
+  </div>
+
+  <!-- Tabelas de Prémios -->
+  <div class="grid-awards">
+    
+    <!-- Bola de Ouro -->
+    <div class="card">
+      <h2 style="color: #f59e0b;">🏆 Bola de Ouro (Pontuação)</h2>
+      <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: -8px; margin-bottom: 12px;">Contabiliza apenas os pontos dos jogos</span>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Jogador</th>
+              <th>Pts</th>
+              <th>J</th>
+              <th>V</th>
+              <th>E</th>
+              <th>D</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBolaOuro"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bota de Ouro -->
+    <div class="card">
+      <h2 style="color: #10b981;">👟 Bota de Ouro (Artilharia)</h2>
+      <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: -8px; margin-bottom: 12px;">Contabiliza apenas os golos marcados</span>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Jogador</th>
+              <th>Golos</th>
+              <th>J</th>
+              <th>Média</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBotaOuro"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Histórico de Jogos -->
+  <div class="card">
+    <h2>4. Histórico de Jogos Registados</h2>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<script>
+  let players = JSON.parse(localStorage.getItem('futsal_players')) || [];
+  let matches = JSON.parse(localStorage.getItem('futsal_matches')) || [];
+  let teamA = [];
+  let teamB = [];
+
+  document.getElementById('matchDate').valueAsDate = new Date();
+
+  function saveStorage() {
+    localStorage.setItem('futsal_players', JSON.stringify(players));
+    localStorage.setItem('futsal_matches', JSON.stringify(matches));
+  }
+
+  function addPlayer() {
+    const nameInput = document.getElementById('playerName');
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      alert("Este jogador já se encontra registado!");
+      return;
+    }
+
+    players.push({
+      id: Date.now(),
+      name: name,
+      points: 0,
+      goals: 0,
+      played: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0
+    });
+
+    nameInput.value = '';
+    saveStorage();
+    render();
+  }
+
+  function renderSelects() {
+    const selectA = document.getElementById('selectA');
+    const selectB = document.getElementById('selectB');
+
+    selectA.innerHTML = '<option value="">+ Adicionar Jogador</option>';
+    selectB.innerHTML = '<option value="">+ Adicionar Jogador</option>';
+
+    players.forEach(p => {
+      const inA = teamA.some(t => t.id === p.id);
+      const inB = teamB.some(t => t.id === p.id);
+
+      if (!inA && !inB) {
+        selectA.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+        selectB.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      }
+    });
+
+    const capA = document.getElementById('captainA');
+    const capB = document.getElementById('captainB');
+
+    const currCapA = capA.value;
+    const currCapB = capB.value;
+
+    capA.innerHTML = '<option value="">-- Selecionar Capitão --</option>' + 
+      teamA.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    capB.innerHTML = '<option value="">-- Selecionar Capitão --</option>' + 
+      teamB.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    capA.value = currCapA;
+    capB.value = currCapB;
+  }
+
+  function addPlayerToTeam(team) {
+    const select = document.getElementById(team === 'A' ? 'selectA' : 'selectB');
+    const playerId = Number(select.value);
+    if (!playerId) return;
+
+    const player = players.find(p => p.id === playerId);
+    if (team === 'A') teamA.push({ ...player, matchGoals: 0 });
+    if (team === 'B') teamB.push({ ...player, matchGoals: 0 });
+
+    renderTeamLists();
+    renderSelects();
+  }
+
+  function removePlayerFromTeam(team, id) {
+    if (team === 'A') teamA = teamA.filter(p => p.id !== id);
+    if (team === 'B') teamB = teamB.filter(p => p.id !== id);
+    renderTeamLists();
+    renderSelects();
+  }
+
+  function updateGoals(team, id, goals) {
+    const list = team === 'A' ? teamA : teamB;
+    const player = list.find(p => p.id === id);
+    if (player) player.matchGoals = Number(goals);
+  }
+
+  function renderTeamLists() {
+    const listA = document.getElementById('listA');
+    const listB = document.getElementById('listB');
+
+    listA.innerHTML = teamA.map(p => `
+      <div class="player-row">
+        <span>${p.name}</span>
+        <div class="player-row-controls">
+          <label style="font-size:12px; color:var(--text-muted);">Golos:</label>
+          <input type="number" min="0" value="${p.matchGoals}" onchange="updateGoals('A', ${p.id}, this.value)">
+          <button onclick="removePlayerFromTeam('A', ${p.id})" class="btn-danger" style="width: auto; padding: 4px 8px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    listB.innerHTML = teamB.map(p => `
+      <div class="player-row">
+        <span>${p.name}</span>
+        <div class="player-row-controls">
+          <label style="font-size:12px; color:var(--text-muted);">Golos:</label>
+          <input type="number" min="0" value="${p.matchGoals}" onchange="updateGoals('B', ${p.id}, this.value)">
+          <button onclick="removePlayerFromTeam('B', ${p.id})" class="btn-danger" style="width: auto; padding: 4px 8px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function saveMatch() {
+    const scoreA = Number(document.getElementById('scoreA').value);
+    const scoreB = Number(document.getElementById('scoreB').value);
+    const matchDate = document.getElementById('matchDate').value;
+    const matchTime = document.getElementById('matchTime').value;
+    const matchLocation = document.getElementById('matchLocation').value.trim() || 'Não especificado';
+    const captainAId = Number(document.getElementById('captainA').value);
+    const captainBId = Number(document.getElementById('captainB').value);
+    const story = document.getElementById('matchStory').value.trim();
+    const photoInput = document.getElementById('matchPhoto');
+    const errorMsg = document.getElementById('errorMsg');
+
+    errorMsg.style.display = 'none';
+
+    if (!matchDate) {
+      errorMsg.innerText = "Erro: Por favor indica a data do jogo.";
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    if (teamA.length === 0 || teamB.length === 0) {
+      errorMsg.innerText = "Erro: Seleciona os jogadores para ambas as equipas.";
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    if (!captainAId) {
+      errorMsg.innerText = "Erro: Por favor seleciona o Capitão da Equipa A.";
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    if (!captainBId) {
+      errorMsg.innerText = "Erro: Por favor seleciona o Capitão da Equipa B.";
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    const totalGoalsA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
+    const totalGoalsB = teamB.reduce((sum, p) => sum + p.matchGoals, 0);
+
+    if (totalGoalsA !== scoreA) {
+      errorMsg.innerText = `Erro na Equipa A: A soma dos golos dos jogadores (${totalGoalsA}) não bate certo com o resultado (${scoreA}).`;
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    if (totalGoalsB !== scoreB) {
+      errorMsg.innerText = `Erro na Equipa B: A soma dos golos dos jogadores (${totalGoalsB}) não bate certo com o resultado (${scoreB}).`;
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    // Processar fotografia
+    let photoBase64 = "";
+    if (photoInput.files && photoInput.files[0]) {
+      photoBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(photoInput.files[0]);
+      });
+    }
+
+    let pointsA = 1, pointsB = 1;
+    let resA = 'loss', resB = 'loss';
+
+    if (scoreA > scoreB) {
+      pointsA = 4; pointsB = 1;
+      resA = 'win'; resB = 'loss';
+    } else if (scoreB > scoreA) {
+      pointsA = 1; pointsB = 4;
+      resA = 'loss'; resB = 'win';
+    } else {
+      pointsA = 2; pointsB = 2;
+      resA = 'draw'; resB = 'draw';
+    }
+
+    const capAObj = teamA.find(p => p.id === captainAId);
+    const capBObj = teamB.find(p => p.id === captainBId);
+
+    matches.unshift({
+      id: Date.now(),
+      date: matchDate,
+      time: matchTime,
+      location: matchLocation,
+      scoreA: scoreA,
+      scoreB: scoreB,
+      captainA: capAObj ? capAObj.name : '',
+      captainB: capBObj ? capBObj.name : '',
+      story: story,
+      photo: photoBase64,
+      teamA: teamA.map(p => ({ name: p.name, goals: p.matchGoals, isCaptain: p.id === captainAId })),
+      teamB: teamB.map(p => ({ name: p.name, goals: p.matchGoals, isCaptain: p.id === captainBId }))
+    });
+
+    players.forEach(p => {
+      const inA = teamA.find(item => item.id === p.id);
+      const inB = teamB.find(item => item.id === p.id);
+
+      if (inA) {
+        p.points += pointsA;
+        p.goals += inA.matchGoals;
+        p.played += 1;
+        if (resA === 'win') p.wins++;
+        if (resA === 'draw') p.draws++;
+        if (resA === 'loss') p.losses++;
+      } else if (inB) {
+        p.points += pointsB;
+        p.goals += inB.matchGoals;
+        p.played += 1;
+        if (resB === 'win') p.wins++;
+        if (resB === 'draw') p.draws++;
+        if (resB === 'loss') p.losses++;
+      }
+    });
+
+    teamA = [];
+    teamB = [];
+    document.getElementById('scoreA').value = 0;
+    document.getElementById('scoreB').value = 0;
+    document.getElementById('captainA').value = '';
+    document.getElementById('captainB').value = '';
+    document.getElementById('matchStory').value = '';
+    document.getElementById('matchPhoto').value = '';
+
+    saveStorage();
+    render();
+    alert("Jogo registado com sucesso!");
+  }
+
+  function renderLeaderboards() {
+    const tbodyBola = document.getElementById('leaderboardBolaOuro');
+    const sortedBola = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
+
+    tbodyBola.innerHTML = sortedBola.map((p, index) => `
+      <tr>
+        <td><strong>${index + 1}º</strong></td>
+        <td><strong>${p.name}</strong></td>
+        <td style="color: var(--gold); font-weight: bold;">${p.points}</td>
+        <td>${p.played}</td>
+        <td>${p.wins}</td>
+        <td>${p.draws}</td>
+        <td>${p.losses}</td>
+      </tr>
+    `).join('');
+
+    const tbodyBota = document.getElementById('leaderboardBotaOuro');
+    const sortedBota = [...players].sort((a, b) => b.goals - a.goals || b.points - a.points);
+
+    tbodyBota.innerHTML = sortedBota.map((p, index) => {
+      const avg = p.played > 0 ? (p.goals / p.played).toFixed(1) : '0.0';
+      return `
+        <tr>
+          <td><strong>${index + 1}º</strong></td>
+          <td><strong>${p.name}</strong></td>
+          <td style="color: var(--accent); font-weight: bold;">${p      gap: 16px;
     }
 
     h1 { font-size: 1.5rem; margin: 0 0 4px 0; color: #fff; }
