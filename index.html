@@ -200,19 +200,6 @@
       border: 1px solid var(--border);
     }
 
-    .audio-player { width: 100%; margin-top: 8px; border-radius: 8px; }
-
-    .audio-recorder-box {
-      background: #0f172a;
-      border: 1px solid var(--border);
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
     .modal {
       display: none;
       position: fixed;
@@ -307,15 +294,6 @@
       <label style="font-size: 12px; color: var(--text-muted);">📷 Foto do Jogo / Vencedores (Opcional):</label>
       <input type="file" id="matchPhoto" accept="image/*" style="margin-top: 4px; margin-bottom: 12px;">
 
-      <label style="font-size: 12px; color: var(--text-muted);">🎙️ Áudio / Comentário por Voz (Opcional):</label>
-      <div class="audio-recorder-box">
-        <div style="display:flex; gap:8px;">
-          <button id="btnStartRec" type="button" onclick="startRecording('main')" style="background:#3b82f6; color:#fff;">🔴 Gravar Voz</button>
-          <button id="btnStopRec" type="button" onclick="stopRecording('main')" style="background:var(--danger); color:#fff; display:none;">⏹️ Parar</button>
-        </div>
-        <audio id="audioPreviewMain" controls style="display:none; width:100%; margin-top:4px;"></audio>
-      </div>
-
       <label style="font-size: 12px; color: var(--text-muted);">📝 História / Comentário Escrito (Opcional):</label>
       <textarea id="matchStory" placeholder="Resumo do jogo, momentos marcantes..."></textarea>
     </div>
@@ -388,15 +366,6 @@
     <label style="font-size: 12px; color: var(--text-muted);">📝 Comentário Escrito:</label>
     <textarea id="editStory" style="margin-bottom:12px;"></textarea>
 
-    <label style="font-size: 12px; color: var(--text-muted);">🎙️ Novo Áudio / Comentário por Voz:</label>
-    <div class="audio-recorder-box">
-      <div style="display:flex; gap:8px;">
-        <button id="btnStartRecEdit" type="button" onclick="startRecording('edit')" style="background:#3b82f6; color:#fff;">🔴 Gravar Novo Áudio</button>
-        <button id="btnStopRecEdit" type="button" onclick="stopRecording('edit')" style="background:var(--danger); color:#fff; display:none;">⏹️ Parar</button>
-      </div>
-      <audio id="audioPreviewEdit" controls style="display:none; width:100%; margin-top:4px;"></audio>
-    </div>
-
     <label style="font-size: 12px; color: var(--text-muted);">📷 Substituir Foto:</label>
     <input type="file" id="editPhoto" accept="image/*" style="margin-bottom:16px;">
 
@@ -413,71 +382,11 @@
   let teamA = [];
   let teamB = [];
 
-  let mediaRecorder;
-  let audioChunks = [];
-  let currentAudioBase64Main = "";
-  let currentAudioBase64Edit = "";
-
   document.getElementById('matchDate').valueAsDate = new Date();
 
   function saveStorage() {
     localStorage.setItem('futsal_players', JSON.stringify(players));
     localStorage.setItem('futsal_matches', JSON.stringify(matches));
-  }
-
-  /* Gravador de Áudio */
-  async function startRecording(target) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-
-      mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-          if (target === 'main') {
-            currentAudioBase64Main = reader.result;
-            const preview = document.getElementById('audioPreviewMain');
-            preview.src = currentAudioBase64Main;
-            preview.style.display = 'block';
-          } else {
-            currentAudioBase64Edit = reader.result;
-            const preview = document.getElementById('audioPreviewEdit');
-            preview.src = currentAudioBase64Edit;
-            preview.style.display = 'block';
-          }
-        };
-      };
-
-      mediaRecorder.start();
-
-      if (target === 'main') {
-        document.getElementById('btnStartRec').style.display = 'none';
-        document.getElementById('btnStopRec').style.display = 'inline-block';
-      } else {
-        document.getElementById('btnStartRecEdit').style.display = 'none';
-        document.getElementById('btnStopRecEdit').style.display = 'inline-block';
-      }
-    } catch (err) {
-      alert("Permissão de microfone negada ou não suportada no navegador.");
-    }
-  }
-
-  function stopRecording(target) {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-      if (target === 'main') {
-        document.getElementById('btnStartRec').style.display = 'inline-block';
-        document.getElementById('btnStopRec').style.display = 'none';
-      } else {
-        document.getElementById('btnStartRecEdit').style.display = 'inline-block';
-        document.getElementById('btnStopRecEdit').style.display = 'none';
-      }
-    }
   }
 
   function addPlayer() {
@@ -533,6 +442,7 @@
     if (team === 'A') teamA.push({ ...player, matchGoals: 0, isCaptain: false });
     if (team === 'B') teamB.push({ ...player, matchGoals: 0, isCaptain: false });
 
+    select.value = "";
     renderTeamLists();
     renderSelects();
   }
@@ -652,7 +562,6 @@
       captainB: capBObj ? capBObj.name : 'N/A',
       story: story,
       photo: photoBase64,
-      audio: currentAudioBase64Main,
       teamA: teamA.map(p => ({ name: p.name, goals: p.matchGoals, isCaptain: p.isCaptain })),
       teamB: teamB.map(p => ({ name: p.name, goals: p.matchGoals, isCaptain: p.isCaptain }))
     });
@@ -671,12 +580,10 @@
     });
 
     teamA = []; teamB = [];
-    currentAudioBase64Main = "";
     document.getElementById('scoreA').value = 0;
     document.getElementById('scoreB').value = 0;
     document.getElementById('matchStory').value = '';
     document.getElementById('matchPhoto').value = '';
-    document.getElementById('audioPreviewMain').style.display = 'none';
 
     saveStorage();
     render();
@@ -727,7 +634,7 @@
       <div class="match-history-card">
         <div class="match-header">
           <span>📅 ${m.date} às ${m.time} (📍 ${m.location})</span>
-          <button onclick="openEditModal(${m.id})" class="btn-edit">✏️ Editar</button>
+          <button onclick="openEditModal(${m.id})" class="btn-edit">✏️ Editar História</button>
         </div>
         <div class="match-body">
           <span style="color: #60a5fa;">Equipa A (${m.scoreA}) <small style="color: var(--gold);">(Cap. ${m.captainA})</small></span>
@@ -735,29 +642,17 @@
           <span style="color: #f87171;">Equipa B (${m.scoreB}) <small style="color: var(--gold);">(Cap. ${m.captainB})</small></span>
         </div>
         ${m.story ? `<div class="match-story">"${m.story}"</div>` : ''}
-        ${m.audio ? `<audio controls src="${m.audio}" class="audio-player"></audio>` : ''}
         ${m.photo ? `<img src="${m.photo}" class="match-photo" alt="Foto do jogo">` : ''}
       </div>
     `).join('');
   }
 
-  /* Edição de Jogo */
   function openEditModal(matchId) {
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
     document.getElementById('editMatchId').value = matchId;
     document.getElementById('editStory').value = match.story || '';
-    currentAudioBase64Edit = match.audio || '';
-    
-    const preview = document.getElementById('audioPreviewEdit');
-    if (match.audio) {
-      preview.src = match.audio;
-      preview.style.display = 'block';
-    } else {
-      preview.style.display = 'none';
-    }
-
     document.getElementById('editModal').style.display = 'flex';
   }
 
@@ -771,7 +666,6 @@
     if (!match) return;
 
     match.story = document.getElementById('editStory').value.trim();
-    if (currentAudioBase64Edit) match.audio = currentAudioBase64Edit;
 
     const photoInput = document.getElementById('editPhoto');
     if (photoInput.files && photoInput.files[0]) {
