@@ -75,7 +75,7 @@
       width: 100%;
     }
 
-    textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+    textarea { resize: vertical; min-height: 80px; font-family: inherit; }
 
     button {
       background: var(--accent);
@@ -141,10 +141,20 @@
 
     .match-img {
       width: 100%;
-      max-height: 250px;
-      object-fit: cover;
+      height: auto;
+      max-height: 500px;
+      object-fit: contain;
       border-radius: 6px;
-      margin-top: 8px;
+      margin-top: 10px;
+      background-color: #000;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #334155;
+      color: #94a3b8;
     }
 
     .modal {
@@ -173,9 +183,12 @@
 <body>
 
 <div class="container">
-  <div>
-    <h1>Futsal Quinta-Feira</h1>
-    <span style="color: var(--text-muted); font-size: 12px;">Gestão de Jogos, Estatísticas e Histórico</span>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <h1>Futsal Quinta-Feira</h1>
+      <span style="color: var(--text-muted); font-size: 12px;">Gestão de Jogos, Estatísticas e Histórico</span>
+    </div>
+    <span id="syncStatus" class="status-badge">🔄 A Ligar à Nuvem...</span>
   </div>
 
   <!-- 1. JOGADORES -->
@@ -239,13 +252,13 @@
       <textarea id="matchStory" placeholder="Resumo do jogo..."></textarea>
     </div>
 
-    <button onclick="saveMatch()" style="margin-top: 12px; padding: 12px;">Gravar Jogo e Atualizar Pontos</button>
+    <button onclick="saveMatch()" style="margin-top: 12px; padding: 12px;">Gravar Jogo e Sincronizar</button>
   </div>
 
-  <!-- AÇÕES -->
-  <div style="display: flex; justify-content: flex-end; gap: 8px;">
+  <!-- AÇÕES DE DADOS -->
+  <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
-    <button onclick="resetData()" class="btn-danger" style="width: auto; padding: 8px 12px; font-size:12px;">Limpar Dados</button>
+    <button onclick="resetData()" class="btn-danger" style="width: auto; padding: 8px 12px; font-size:12px;">Limpar Tudo</button>
   </div>
 
   <!-- TABELAS -->
@@ -320,23 +333,67 @@
   </div>
 </div>
 
-<script>
-  let players = JSON.parse(localStorage.getItem('futsal_players_v2')) || [];
-  let matches = JSON.parse(localStorage.getItem('futsal_matches_v2')) || [];
-  let teamA = [];
-  let teamB = [];
+<!-- SDK Firebase em Tempo Real com as tuas Chaves Reais -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA3SlNvLBYvM0LCM1mbWHy7J_bGoREY438",
+    authDomain: "futsal-5as.firebaseapp.com",
+    projectId: "futsal-5as",
+    storageBucket: "futsal-5as.firebasestorage.app",
+    messagingSenderId: "520970380060",
+    appId: "1:520970380060:web:9262b13ef743a3b87950d9"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const docRef = doc(db, "futsal", "dados_gerais");
+
+  window.players = [];
+  window.matches = [];
+  window.teamA = [];
+  window.teamB = [];
 
   document.getElementById('matchDate').valueAsDate = new Date();
 
-  function saveStorage() {
-    try {
-      localStorage.setItem('futsal_players_v2', JSON.stringify(players));
-      localStorage.setItem('futsal_matches_v2', JSON.stringify(matches));
-    } catch (e) {
-      alert("Aviso: O armazenamento local está cheio. A foto pode não ter sido guardada.");
+  // Escutar alterações na nuvem em tempo real (Sincronização Bidirecional)
+  onSnapshot(docRef, (docSnap) => {
+    const statusEl = document.getElementById('syncStatus');
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      window.players = data.players || [];
+      window.matches = data.matches || [];
+      statusEl.innerText = "🟢 Sincronizado (Nuvem)";
+      statusEl.style.background = "rgba(16, 185, 129, 0.2)";
+      statusEl.style.color = "#10b981";
+      render();
+    } else {
+      statusEl.innerText = "🟡 Nuvem Pronta";
+      saveCloudStorage();
     }
-  }
+  }, (err) => {
+    const statusEl = document.getElementById('syncStatus');
+    statusEl.innerText = "🔴 Erro de Ligação";
+    statusEl.style.background = "rgba(239, 68, 68, 0.2)";
+    statusEl.style.color = "#ef4444";
+  });
 
+  window.saveCloudStorage = async function() {
+    try {
+      await setDoc(docRef, {
+        players: window.players,
+        matches: window.matches,
+        lastUpdated: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Erro ao guardar na nuvem:", e);
+    }
+  };
+</script>
+
+<script>
   function addPlayer() {
     const input = document.getElementById('playerName');
     const name = input.value.trim();
@@ -349,7 +406,7 @@
 
     players.push({ id: Date.now(), name: name, points: 0, goals: 0, played: 0, wins: 0, draws: 0, losses: 0 });
     input.value = '';
-    saveStorage();
+    saveCloudStorage();
     render();
   }
 
@@ -360,7 +417,7 @@
     const newName = prompt("Alterar nome do jogador:", p.name);
     if (newName && newName.trim() !== "") {
       p.name = newName.trim();
-      saveStorage();
+      saveCloudStorage();
       render();
     }
   }
@@ -373,14 +430,14 @@
       players = players.filter(x => x.id !== id);
       teamA = teamA.filter(x => x.id !== id);
       teamB = teamB.filter(x => x.id !== id);
-      saveStorage();
+      saveCloudStorage();
       render();
     }
   }
 
   function renderRegisteredPlayers() {
     const container = document.getElementById('registeredPlayersList');
-    if (players.length === 0) {
+    if (!players || players.length === 0) {
       container.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">Nenhum jogador registado ainda.</span>`;
       return;
     }
@@ -401,6 +458,8 @@
     const selB = document.getElementById('selectB');
     selA.innerHTML = '<option value="">+ Jogador</option>';
     selB.innerHTML = '<option value="">+ Jogador</option>';
+
+    if (!players) return;
 
     players.forEach(p => {
       const inA = teamA.some(t => t.id === p.id);
@@ -554,12 +613,13 @@
     document.getElementById('matchStory').value = '';
     document.getElementById('matchPhoto').value = '';
 
-    saveStorage();
+    saveCloudStorage();
     render();
-    alert("Jogo gravado com sucesso!");
+    alert("Jogo gravado e sincronizado com a nuvem!");
   }
 
   function renderLeaderboards() {
+    if (!players) return;
     const sortedPts = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
     document.getElementById('leaderboardPoints').innerHTML = sortedPts.map((p, i) => `
       <tr>
@@ -584,7 +644,7 @@
 
   function renderHistory() {
     const container = document.getElementById('historyList');
-    if (matches.length === 0) {
+    if (!matches || matches.length === 0) {
       container.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">Nenhum jogo registado.</span>`;
       return;
     }
@@ -642,14 +702,14 @@
       m.photo = await compressImage(photoInput.files[0]);
     }
 
-    saveStorage();
+    saveCloudStorage();
     render();
     closeModal();
-    alert("Jogo atualizado com sucesso!");
+    alert("Jogo atualizado e sincronizado com a nuvem!");
   }
 
   function exportToExcel() {
-    if (players.length === 0) return alert("Sem dados para exportar.");
+    if (!players || players.length === 0) return alert("Sem dados para exportar.");
 
     const loadScript = new Promise((resolve) => {
       if (window.XLSX) return resolve();
@@ -674,9 +734,9 @@
   }
 
   function resetData() {
-    if (confirm("Tens a certeza que queres apagar todos os dados?")) {
+    if (confirm("Tens a certeza que queres apagar todos os dados na nuvem?")) {
       players = []; matches = []; teamA = []; teamB = [];
-      saveStorage();
+      saveCloudStorage();
       render();
     }
   }
@@ -688,8 +748,6 @@
     renderLeaderboards();
     renderHistory();
   }
-
-  render();
 </script>
 
 </body>
