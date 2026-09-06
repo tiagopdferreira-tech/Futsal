@@ -257,6 +257,7 @@
 
   <!-- AÇÕES DE DADOS -->
   <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+    <button onclick="recoverLocalData()" style="width: auto; padding: 8px 12px; background: #0284c7; color:#fff;">🔄 Recuperar Dados Locais</button>
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
     <button onclick="resetData()" class="btn-danger" style="width: auto; padding: 8px 12px; font-size:12px;">Limpar Tudo</button>
   </div>
@@ -333,7 +334,6 @@
   </div>
 </div>
 
-<!-- SDK Firebase em Tempo Real com as tuas Chaves Reais -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -358,20 +358,25 @@
 
   document.getElementById('matchDate').valueAsDate = new Date();
 
-  // Escutar alterações na nuvem em tempo real (Sincronização Bidirecional)
   onSnapshot(docRef, (docSnap) => {
     const statusEl = document.getElementById('syncStatus');
     if (docSnap.exists()) {
       const data = docSnap.data();
       window.players = data.players || [];
       window.matches = data.matches || [];
+      
+      // Se a nuvem estiver vazia, tenta migrar automaticamente do localStorage local
+      if (window.players.length === 0 && window.matches.length === 0) {
+        checkAndMigrateLocalData();
+      }
+
       statusEl.innerText = "🟢 Sincronizado (Nuvem)";
       statusEl.style.background = "rgba(16, 185, 129, 0.2)";
       statusEl.style.color = "#10b981";
       render();
     } else {
       statusEl.innerText = "🟡 Nuvem Pronta";
-      saveCloudStorage();
+      checkAndMigrateLocalData();
     }
   }, (err) => {
     const statusEl = document.getElementById('syncStatus');
@@ -379,6 +384,29 @@
     statusEl.style.background = "rgba(239, 68, 68, 0.2)";
     statusEl.style.color = "#ef4444";
   });
+
+  function checkAndMigrateLocalData() {
+    const localP = JSON.parse(localStorage.getItem('futsal_players_v2')) || [];
+    const localM = JSON.parse(localStorage.getItem('futsal_matches_v2')) || [];
+    if (localP.length > 0 || localM.length > 0) {
+      window.players = localP;
+      window.matches = localM;
+      saveCloudStorage();
+    }
+  }
+
+  window.recoverLocalData = function() {
+    const localP = JSON.parse(localStorage.getItem('futsal_players_v2')) || [];
+    const localM = JSON.parse(localStorage.getItem('futsal_matches_v2')) || [];
+    if (localP.length > 0 || localM.length > 0) {
+      window.players = localP;
+      window.matches = localM;
+      saveCloudStorage();
+      alert("Dados locais recuperados e enviados para a nuvem com sucesso!");
+    } else {
+      alert("Nenhum dado local encontrado neste navegador.");
+    }
+  };
 
   window.saveCloudStorage = async function() {
     try {
