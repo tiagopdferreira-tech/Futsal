@@ -131,6 +131,7 @@
     .match-header {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       color: var(--text-muted);
       font-size: 12px;
       margin-bottom: 6px;
@@ -150,11 +151,11 @@
       display: none;
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8);
+      background: rgba(0,0,0,0.85);
       justify-content: center;
       align-items: center;
       padding: 12px;
-      z-index: 100;
+      z-index: 1000;
     }
 
     .modal-content {
@@ -162,8 +163,10 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      max-width: 500px;
+      max-width: 550px;
       width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
     }
   </style>
 </head>
@@ -177,11 +180,14 @@
 
   <!-- 1. JOGADORES -->
   <div class="card">
-    <h2>1. Adicionar Jogador</h2>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="playerName" placeholder="Nome do Jogador">
-      <button onclick="addPlayer()" style="width: auto; padding: 0 16px;">Guardar</button>
+    <h2>1. Gestão de Jogadores</h2>
+    <div style="display:flex; gap:8px; margin-bottom: 12px;">
+      <input type="text" id="playerName" placeholder="Nome do Novo Jogador">
+      <button onclick="addPlayer()" style="width: auto; padding: 0 16px;">Adicionar</button>
     </div>
+    
+    <label style="font-size:11px; color:var(--text-muted);">Jogadores Registados (Editar / Remover):</label>
+    <div id="registeredPlayersList" style="margin-top:6px;"></div>
   </div>
 
   <!-- 2. REGISTAR JOGO -->
@@ -272,14 +278,43 @@
   </div>
 </div>
 
-<!-- MODAL EDICAO -->
+<!-- MODAL EDITAR JOGO COMPLETO -->
 <div id="editModal" class="modal">
   <div class="modal-content">
-    <h2>✏️ Editar Comentário</h2>
+    <h2>✏️ Editar Informações do Jogo</h2>
     <input type="hidden" id="editMatchId">
+
+    <div class="grid-details" style="margin-top:10px;">
+      <div>
+        <label style="font-size:11px; color:var(--text-muted);">Data:</label>
+        <input type="date" id="editDate">
+      </div>
+      <div>
+        <label style="font-size:11px; color:var(--text-muted);">Hora:</label>
+        <input type="time" id="editTime">
+      </div>
+      <div>
+        <label style="font-size:11px; color:var(--text-muted);">Pavilhão:</label>
+        <input type="text" id="editLocation">
+      </div>
+    </div>
+
+    <div class="score-box">
+      <span>Eq. A</span>
+      <input type="number" id="editScoreA" min="0">
+      <span>vs</span>
+      <input type="number" id="editScoreB" min="0">
+      <span>Eq. B</span>
+    </div>
+
+    <label style="font-size:11px; color:var(--text-muted);">📝 Comentário / História:</label>
     <textarea id="editStory" style="margin-bottom:12px;"></textarea>
+
+    <label style="font-size:11px; color:var(--text-muted);">📷 Substituir Foto:</label>
+    <input type="file" id="editPhoto" accept="image/*" style="margin-bottom:16px;">
+
     <div style="display:flex; gap:8px;">
-      <button onclick="saveEditMatch()">Guardar</button>
+      <button onclick="saveEditMatch()">Guardar Alterações</button>
       <button onclick="closeModal()" class="btn-danger">Cancelar</button>
     </div>
   </div>
@@ -316,6 +351,49 @@
     input.value = '';
     saveStorage();
     render();
+  }
+
+  function editPlayerName(id) {
+    const p = players.find(x => x.id === id);
+    if (!p) return;
+
+    const newName = prompt("Alterar nome do jogador:", p.name);
+    if (newName && newName.trim() !== "") {
+      p.name = newName.trim();
+      saveStorage();
+      render();
+    }
+  }
+
+  function deletePlayer(id) {
+    const p = players.find(x => x.id === id);
+    if (!p) return;
+
+    if (confirm(`Tem a certeza que deseja remover ${p.name}?`)) {
+      players = players.filter(x => x.id !== id);
+      teamA = teamA.filter(x => x.id !== id);
+      teamB = teamB.filter(x => x.id !== id);
+      saveStorage();
+      render();
+    }
+  }
+
+  function renderRegisteredPlayers() {
+    const container = document.getElementById('registeredPlayersList');
+    if (players.length === 0) {
+      container.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">Nenhum jogador registado ainda.</span>`;
+      return;
+    }
+
+    container.innerHTML = players.map(p => `
+      <div class="player-row">
+        <span>${p.name}</span>
+        <div class="player-controls">
+          <button onclick="editPlayerName(${p.id})" class="btn-edit">✏️ Alterar</button>
+          <button onclick="deletePlayer(${p.id})" class="btn-danger" style="width:auto; padding:3px 8px; font-size:12px;">✕</button>
+        </div>
+      </div>
+    `).join('');
   }
 
   function renderSelects() {
@@ -389,7 +467,6 @@
     `).join('');
   }
 
-  // Redimensiona fotos para não crashar a memória do telemóvel
   function compressImage(file) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -411,7 +488,7 @@
 
           canvas.width = width;
           canvas.height = height;
-          const ctx = canvas.getContext('canvas');
+          const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
@@ -516,7 +593,7 @@
       <div class="match-card">
         <div class="match-header">
           <span>📅 ${m.date} às ${m.time} (📍 ${m.location})</span>
-          <button onclick="openModal(${m.id})" class="btn-edit">✏️ Comentário</button>
+          <button onclick="openModal(${m.id})" class="btn-edit">✏️ Editar Jogo</button>
         </div>
         <div style="display:flex; justify-content:space-between; font-weight:bold;">
           <span style="color:#60a5fa;">Eq. A (${m.scoreA}) <small>👑 ${m.capA}</small></span>
@@ -532,8 +609,15 @@
   function openModal(id) {
     const m = matches.find(x => x.id === id);
     if (!m) return;
+
     document.getElementById('editMatchId').value = id;
+    document.getElementById('editDate').value = m.date;
+    document.getElementById('editTime').value = m.time;
+    document.getElementById('editLocation').value = m.location;
+    document.getElementById('editScoreA').value = m.scoreA;
+    document.getElementById('editScoreB').value = m.scoreB;
     document.getElementById('editStory').value = m.story || '';
+
     document.getElementById('editModal').style.display = 'flex';
   }
 
@@ -541,18 +625,29 @@
     document.getElementById('editModal').style.display = 'none';
   }
 
-  function saveEditMatch() {
+  async function saveEditMatch() {
     const id = Number(document.getElementById('editMatchId').value);
     const m = matches.find(x => x.id === id);
-    if (m) {
-      m.story = document.getElementById('editStory').value.trim();
-      saveStorage();
-      render();
+    if (!m) return;
+
+    m.date = document.getElementById('editDate').value;
+    m.time = document.getElementById('editTime').value;
+    m.location = document.getElementById('editLocation').value.trim();
+    m.scoreA = Number(document.getElementById('editScoreA').value);
+    m.scoreB = Number(document.getElementById('editScoreB').value);
+    m.story = document.getElementById('editStory').value.trim();
+
+    const photoInput = document.getElementById('editPhoto');
+    if (photoInput.files && photoInput.files[0]) {
+      m.photo = await compressImage(photoInput.files[0]);
     }
+
+    saveStorage();
+    render();
     closeModal();
+    alert("Jogo atualizado com sucesso!");
   }
 
-  // Carregamento dinâmico da biblioteca Excel para não arrastar a página no telemóvel
   function exportToExcel() {
     if (players.length === 0) return alert("Sem dados para exportar.");
 
@@ -566,9 +661,9 @@
 
     loadScript.then(() => {
       const sorted = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
-      const data = sorted.map((p, i) => ({
-        "Posição": `${i + 1}º`, "Jogador": p.name, "Pontos": p.points,
-        "Golos": p.goals, "Jogos": p.played, "Vitórias": p.wins, "Empates": p.draws, "Derrotas": p.losses
+      const data = sorted.map((i, p) => ({
+        "Posição": `${p + 1}º`, "Jogador": i.name, "Pontos": i.points,
+        "Golos": i.goals, "Jogos": i.played, "Vitórias": i.wins, "Empates": i.draws, "Derrotas": i.losses
       }));
 
       const ws = XLSX.utils.json_to_sheet(data);
@@ -587,6 +682,7 @@
   }
 
   function render() {
+    renderRegisteredPlayers();
     renderSelects();
     renderTeams();
     renderLeaderboards();
