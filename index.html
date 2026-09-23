@@ -75,7 +75,7 @@
       width: 100%;
     }
 
-    textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+    textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 
     button {
       background: var(--accent);
@@ -97,8 +97,8 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .player-controls { display: flex; align-items: center; gap: 6px; }
-    .player-controls input[type="number"] { width: 55px; text-align: center; }
+    .player-controls { display: flex; align-items: center; gap: 4px; }
+    .player-controls input[type="number"] { width: 45px; text-align: center; padding: 6px; }
 
     .score-box {
       display: flex;
@@ -147,6 +147,14 @@
       border-radius: 6px;
       margin-top: 10px;
       background-color: #000;
+    }
+
+    .audio-box {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      padding: 8px;
+      border-radius: 8px;
+      margin-top: 8px;
     }
 
     .status-badge {
@@ -245,10 +253,19 @@
     </div>
 
     <div style="margin-top: 12px;">
-      <label style="font-size:11px; color:var(--text-muted);">📷 Foto do Jogo (Opcional):</label>
+      <label style="font-size:11px; color:var(--text-muted);">🎙️ Comentário por Voz (Opcional):</label>
+      <div class="audio-box">
+        <div style="display:flex; gap:8px;">
+          <button id="btnRecMain" type="button" onclick="startRecording('main')" style="background:#3b82f6; color:#fff;">🔴 Gravar Voz</button>
+          <button id="btnStopMain" type="button" onclick="stopRecording('main')" style="background:var(--danger); color:#fff; display:none;">⏹️ Parar</button>
+        </div>
+        <audio id="audioPreviewMain" controls style="display:none; width:100%; margin-top:8px;"></audio>
+      </div>
+
+      <label style="font-size:11px; color:var(--text-muted); margin-top:8px; display:block;">📷 Foto do Jogo (Opcional):</label>
       <input type="file" id="matchPhoto" accept="image/*" style="margin-top:4px; margin-bottom: 8px;">
 
-      <label style="font-size:11px; color:var(--text-muted);">📝 História / Comentário (Opcional):</label>
+      <label style="font-size:11px; color:var(--text-muted);">📝 História / Comentário Escrito (Opcional):</label>
       <textarea id="matchStory" placeholder="Resumo do jogo..."></textarea>
     </div>
 
@@ -278,7 +295,7 @@
       <h2 style="color: #10b981;">👟 Bota de Ouro</h2>
       <div class="table-wrapper">
         <table>
-          <thead><tr><th>Pos</th><th>Nome</th><th>Golos</th><th>J</th></tr></thead>
+          <thead><tr><th>Pos</th><th>Nome</th><th>Golos</th><th>AG</th><th>J</th></tr></thead>
           <tbody id="leaderboardGoals"></tbody>
         </table>
       </div>
@@ -319,6 +336,15 @@
       <span>vs</span>
       <input type="number" id="editScoreB" min="0">
       <span>Eq. B</span>
+    </div>
+
+    <label style="font-size:11px; color:var(--text-muted);">🎙️ Novo Áudio:</label>
+    <div class="audio-box" style="margin-bottom:12px;">
+      <div style="display:flex; gap:8px;">
+        <button id="btnRecEdit" type="button" onclick="startRecording('edit')" style="background:#3b82f6; color:#fff;">🔴 Gravar Novo Áudio</button>
+        <button id="btnStopEdit" type="button" onclick="stopRecording('edit')" style="background:var(--danger); color:#fff; display:none;">⏹️ Parar</button>
+      </div>
+      <audio id="audioPreviewEdit" controls style="display:none; width:100%; margin-top:8px;"></audio>
     </div>
 
     <label style="font-size:11px; color:var(--text-muted);">📝 Comentário / História:</label>
@@ -365,7 +391,6 @@
       window.players = data.players || [];
       window.matches = data.matches || [];
       
-      // Se a nuvem estiver vazia, tenta migrar automaticamente do localStorage local
       if (window.players.length === 0 && window.matches.length === 0) {
         checkAndMigrateLocalData();
       }
@@ -422,6 +447,62 @@
 </script>
 
 <script>
+  let mediaRecorder;
+  let audioChunks = [];
+  let currentAudioMain = "";
+  let currentAudioEdit = "";
+
+  /* Gravador de Áudio Leve */
+  async function startRecording(target) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          if (target === 'main') {
+            currentAudioMain = reader.result;
+            const p = document.getElementById('audioPreviewMain');
+            p.src = currentAudioMain; p.style.display = 'block';
+          } else {
+            currentAudioEdit = reader.result;
+            const p = document.getElementById('audioPreviewEdit');
+            p.src = currentAudioEdit; p.style.display = 'block';
+          }
+        };
+      };
+
+      mediaRecorder.start();
+      if (target === 'main') {
+        document.getElementById('btnRecMain').style.display = 'none';
+        document.getElementById('btnStopMain').style.display = 'inline-block';
+      } else {
+        document.getElementById('btnRecEdit').style.display = 'none';
+        document.getElementById('btnStopEdit').style.display = 'inline-block';
+      }
+    } catch (e) {
+      alert("Permissão de microfone negada ou não suportada no navegador.");
+    }
+  }
+
+  function stopRecording(target) {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      if (target === 'main') {
+        document.getElementById('btnRecMain').style.display = 'inline-block';
+        document.getElementById('btnStopMain').style.display = 'none';
+      } else {
+        document.getElementById('btnRecEdit').style.display = 'inline-block';
+        document.getElementById('btnStopEdit').style.display = 'none';
+      }
+    }
+  }
+
   function addPlayer() {
     const input = document.getElementById('playerName');
     const name = input.value.trim();
@@ -432,7 +513,7 @@
       return;
     }
 
-    players.push({ id: Date.now(), name: name, points: 0, goals: 0, played: 0, wins: 0, draws: 0, losses: 0 });
+    players.push({ id: Date.now(), name: name, points: 0, goals: 0, ownGoals: 0, played: 0, wins: 0, draws: 0, losses: 0 });
     input.value = '';
     saveCloudStorage();
     render();
@@ -505,8 +586,8 @@
     if (!id) return;
 
     const p = players.find(x => x.id === id);
-    if (team === 'A') teamA.push({ ...p, matchGoals: 0, isCaptain: false });
-    if (team === 'B') teamB.push({ ...p, matchGoals: 0, isCaptain: false });
+    if (team === 'A') teamA.push({ ...p, matchGoals: 0, ownGoals: 0, isCaptain: false });
+    if (team === 'B') teamB.push({ ...p, matchGoals: 0, ownGoals: 0, isCaptain: false });
 
     select.value = '';
     render();
@@ -524,6 +605,12 @@
     if (p) p.matchGoals = Number(val);
   }
 
+  function updateOwnGoals(team, id, val) {
+    const list = team === 'A' ? teamA : teamB;
+    const p = list.find(x => x.id === id);
+    if (p) p.ownGoals = Number(val);
+  }
+
   function toggleCaptain(team, id) {
     const list = team === 'A' ? teamA : teamB;
     list.forEach(p => p.isCaptain = (p.id === id));
@@ -535,8 +622,11 @@
       <div class="player-row">
         <span>${p.name} ${p.isCaptain ? '👑' : ''}</span>
         <div class="player-controls">
-          <button onclick="toggleCaptain('A', ${p.id})" style="width:auto; padding:2px 6px; font-size:10px;">👑</button>
+          <button onclick="toggleCaptain('A', ${p.id})" style="width:auto; padding:2px 4px; font-size:10px;">👑</button>
+          <label style="font-size:10px; color:var(--text-muted);">G:</label>
           <input type="number" min="0" value="${p.matchGoals}" onchange="updateGoals('A', ${p.id}, this.value)">
+          <label style="font-size:10px; color:#ef4444;">AG:</label>
+          <input type="number" min="0" value="${p.ownGoals || 0}" onchange="updateOwnGoals('A', ${p.id}, this.value)">
           <button onclick="removePlayer('A', ${p.id})" class="btn-danger" style="width:auto; padding:2px 6px;">✕</button>
         </div>
       </div>
@@ -546,8 +636,11 @@
       <div class="player-row">
         <span>${p.name} ${p.isCaptain ? '👑' : ''}</span>
         <div class="player-controls">
-          <button onclick="toggleCaptain('B', ${p.id})" style="width:auto; padding:2px 6px; font-size:10px;">👑</button>
+          <button onclick="toggleCaptain('B', ${p.id})" style="width:auto; padding:2px 4px; font-size:10px;">👑</button>
+          <label style="font-size:10px; color:var(--text-muted);">G:</label>
           <input type="number" min="0" value="${p.matchGoals}" onchange="updateGoals('B', ${p.id}, this.value)">
+          <label style="font-size:10px; color:#ef4444;">AG:</label>
+          <input type="number" min="0" value="${p.ownGoals || 0}" onchange="updateOwnGoals('B', ${p.id}, this.value)">
           <button onclick="removePlayer('B', ${p.id})" class="btn-danger" style="width:auto; padding:2px 6px;">✕</button>
         </div>
       </div>
@@ -597,11 +690,18 @@
     if (!date) return alert("Indica a data do jogo.");
     if (teamA.length === 0 || teamB.length === 0) return alert("Adiciona jogadores a ambas as equipas.");
 
-    const totA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
-    const totB = teamB.reduce((sum, p) => sum + p.matchGoals, 0);
+    // Validação com Auto-Golos (Golos da equipa + Auto-golos do adversário)
+    const goalsA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
+    const ownGoalsA = teamA.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
-    if (totA !== sA || totB !== sB) {
-      return alert("A soma dos golos dos jogadores não corresponde ao resultado global.");
+    const goalsB = teamB.reduce((sum, p) => sum + p.matchGoals, 0);
+    const ownGoalsB = teamB.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+
+    const calcScoreA = goalsA + ownGoalsB;
+    const calcScoreB = goalsB + ownGoalsA;
+
+    if (calcScoreA !== sA || calcScoreB !== sB) {
+      return alert(`A soma dos golos não corresponde ao resultado global!\nEquipa A: ${goalsA} golos + ${ownGoalsB} AG do adversário = ${calcScoreA} (Marcado: ${sA})\nEquipa B: ${goalsB} golos + ${ownGoalsA} AG do adversário = ${calcScoreB} (Marcado: ${sB})`);
     }
 
     let photoBase64 = "";
@@ -619,7 +719,7 @@
 
     matches.unshift({
       id: Date.now(), date, time, location, scoreA: sA, scoreB: sB,
-      capA, capB, story, photo: photoBase64
+      capA, capB, story, photo: photoBase64, audio: currentAudioMain
     });
 
     players.forEach(p => {
@@ -627,19 +727,20 @@
       const inB = teamB.find(x => x.id === p.id);
 
       if (inA) {
-        p.points += pA; p.goals += inA.matchGoals; p.played++;
+        p.points += pA; p.goals += inA.matchGoals; p.ownGoals = (p.ownGoals || 0) + (inA.ownGoals || 0); p.played++;
         if (resA === 'win') p.wins++; else if (resA === 'draw') p.draws++; else p.losses++;
       } else if (inB) {
-        p.points += pB; p.goals += inB.matchGoals; p.played++;
+        p.points += pB; p.goals += inB.matchGoals; p.ownGoals = (p.ownGoals || 0) + (inB.ownGoals || 0); p.played++;
         if (resB === 'win') p.wins++; else if (resB === 'draw') p.draws++; else p.losses++;
       }
     });
 
-    teamA = []; teamB = [];
+    teamA = []; teamB = []; currentAudioMain = "";
     document.getElementById('scoreA').value = 0;
     document.getElementById('scoreB').value = 0;
     document.getElementById('matchStory').value = '';
     document.getElementById('matchPhoto').value = '';
+    document.getElementById('audioPreviewMain').style.display = 'none';
 
     saveCloudStorage();
     render();
@@ -659,12 +760,13 @@
       </tr>
     `).join('');
 
-    const sortedGls = [...players].sort((a, b) => b.goals - a.goals || b.points - a.points);
+    const sortedGls = [...players].sort((a, b) => b.goals - a.goals || (a.ownGoals || 0) - (b.ownGoals || 0));
     document.getElementById('leaderboardGoals').innerHTML = sortedGls.map((p, i) => `
       <tr>
         <td><strong>${i + 1}º</strong></td>
         <td>${p.name}</td>
         <td style="color:var(--accent); font-weight:bold;">${p.goals}</td>
+        <td style="color:#ef4444;">${p.ownGoals || 0}</td>
         <td>${p.played}</td>
       </tr>
     `).join('');
@@ -689,6 +791,7 @@
           <span style="color:#f87171;">Eq. B (${m.scoreB}) <small>👑 ${m.capB}</small></span>
         </div>
         ${m.story ? `<div style="margin-top:6px; font-style:italic; font-size:12px; color:#cbd5e1;">"${m.story}"</div>` : ''}
+        ${m.audio ? `<audio controls src="${m.audio}" style="width:100%; margin-top:8px;"></audio>` : ''}
         ${m.photo ? `<img src="${m.photo}" class="match-img">` : ''}
       </div>
     `).join('');
@@ -705,6 +808,15 @@
     document.getElementById('editScoreA').value = m.scoreA;
     document.getElementById('editScoreB').value = m.scoreB;
     document.getElementById('editStory').value = m.story || '';
+
+    currentAudioEdit = m.audio || '';
+    const preview = document.getElementById('audioPreviewEdit');
+    if (m.audio) {
+      preview.src = m.audio;
+      preview.style.display = 'block';
+    } else {
+      preview.style.display = 'none';
+    }
 
     document.getElementById('editModal').style.display = 'flex';
   }
@@ -724,6 +836,7 @@
     m.scoreA = Number(document.getElementById('editScoreA').value);
     m.scoreB = Number(document.getElementById('editScoreB').value);
     m.story = document.getElementById('editStory').value.trim();
+    if (currentAudioEdit) m.audio = currentAudioEdit;
 
     const photoInput = document.getElementById('editPhoto');
     if (photoInput.files && photoInput.files[0]) {
@@ -751,7 +864,7 @@
       const sorted = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
       const data = sorted.map((i, p) => ({
         "Posição": `${p + 1}º`, "Jogador": i.name, "Pontos": i.points,
-        "Golos": i.goals, "Jogos": i.played, "Vitórias": i.wins, "Empates": i.draws, "Derrotas": i.losses
+        "Golos Marcados": i.goals, "Auto-Golos": i.ownGoals || 0, "Jogos": i.played, "Vitórias": i.wins, "Empates": i.draws, "Derrotas": i.losses
       }));
 
       const ws = XLSX.utils.json_to_sheet(data);
