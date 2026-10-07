@@ -408,7 +408,6 @@
 
   document.getElementById('matchDate').valueAsDate = new Date();
 
-  // Escuta em tempo real com proteção contra dados vazios da nuvem
   onSnapshot(docRef, (docSnap) => {
     const statusEl = document.getElementById('syncStatus');
     if (docSnap.exists()) {
@@ -416,7 +415,6 @@
       const cloudPlayers = data.players || [];
       const cloudMatches = data.matches || [];
 
-      // Blindagem: Se a nuvem trouxer dados válidos, atualiza o ecrã
       if (cloudPlayers.length > 0 || cloudMatches.length > 0) {
         window.players = cloudPlayers;
         window.matches = cloudMatches;
@@ -436,12 +434,8 @@
     statusEl.style.color = "#ef4444";
   });
 
-  // Função de gravação na nuvem com verificação de segurança (nunca grava se estiver vazio)
   window.saveCloudStorage = async function() {
-    if (!window.players || window.players.length === 0) {
-      console.warn("Tentativa de gravação bloqueada por segurança (dados vazios).");
-      return;
-    }
+    if (!window.players || window.players.length === 0) return;
     try {
       await setDoc(docRef, {
         players: window.players,
@@ -515,8 +509,10 @@
     const name = input.value.trim();
     if (!name) return;
 
-    if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-      alert("Este jogador já existe!");
+    // Validação de nomes duplicados (insensível a maiúsculas/minúsculas)
+    const exists = players.some(p => p.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      alert("Já existe um jogador com esse nome, por favor, verifique/corrija o nome");
       return;
     }
 
@@ -532,7 +528,13 @@
 
     const newName = prompt("Alterar nome do jogador:", p.name);
     if (newName && newName.trim() !== "") {
-      p.name = newName.trim();
+      const trimmedName = newName.trim();
+      const exists = players.some(x => x.id !== id && x.name.toLowerCase() === trimmedName.toLowerCase());
+      if (exists) {
+        alert("Já existe um jogador com esse nome, por favor, verifique/corrija o nome");
+        return;
+      }
+      p.name = trimmedName;
       saveCloudStorage();
       render();
     }
