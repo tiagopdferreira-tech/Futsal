@@ -16,6 +16,7 @@
       --danger: #ef4444;
       --excel: #16a34a;
       --gold: #f59e0b;
+      --warning: #f59e0b;
     }
 
     * { box-sizing: border-box; }
@@ -163,6 +164,16 @@
       border-radius: 4px;
       background: #334155;
       color: #94a3b8;
+    }
+
+    .badge-warning {
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+      border: 1px solid #f59e0b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
     }
 
     .modal {
@@ -452,7 +463,6 @@
   let currentAudioMain = "";
   let currentAudioEdit = "";
 
-  /* Gravador de Áudio Leve */
   async function startRecording(target) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -690,7 +700,7 @@
     if (!date) return alert("Indica a data do jogo.");
     if (teamA.length === 0 || teamB.length === 0) return alert("Adiciona jogadores a ambas as equipas.");
 
-    // Validação com Auto-Golos (Golos da equipa + Auto-golos do adversário)
+    // Cálculo da verificação
     const goalsA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
     const ownGoalsA = teamA.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
@@ -700,8 +710,15 @@
     const calcScoreA = goalsA + ownGoalsB;
     const calcScoreB = goalsB + ownGoalsA;
 
+    let hasMismatch = false;
+
+    // Em vez de bloquear, apenas avisa se não bater certo
     if (calcScoreA !== sA || calcScoreB !== sB) {
-      return alert(`A soma dos golos não corresponde ao resultado global!\nEquipa A: ${goalsA} golos + ${ownGoalsB} AG do adversário = ${calcScoreA} (Marcado: ${sA})\nEquipa B: ${goalsB} golos + ${ownGoalsA} AG do adversário = ${calcScoreB} (Marcado: ${sB})`);
+      hasMismatch = true;
+      alert(`⚠️ AVISO DE DADOS INCOMPLETOS / DIVERGENTES:\n\n` +
+            `Resultado Registado: Equipa A (${sA}) vs (${sB}) Equipa B\n` +
+            `Golos Atribuídos: Equipa A (${calcScoreA}) vs (${calcScoreB}) Equipa B\n\n` +
+            `O jogo vai ser gravado na mesma, mas ficará marcado com o aviso "Golos Incompletos".`);
     }
 
     let photoBase64 = "";
@@ -719,7 +736,8 @@
 
     matches.unshift({
       id: Date.now(), date, time, location, scoreA: sA, scoreB: sB,
-      capA, capB, story, photo: photoBase64, audio: currentAudioMain
+      capA, capB, story, photo: photoBase64, audio: currentAudioMain,
+      hasGoalMismatch: hasMismatch
     });
 
     players.forEach(p => {
@@ -744,7 +762,7 @@
 
     saveCloudStorage();
     render();
-    alert("Jogo gravado e sincronizado com a nuvem!");
+    alert("Jogo gravado e sincronizado com sucesso!");
   }
 
   function renderLeaderboards() {
@@ -782,7 +800,10 @@
     container.innerHTML = matches.map(m => `
       <div class="match-card">
         <div class="match-header">
-          <span>📅 ${m.date} às ${m.time} (📍 ${m.location})</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>📅 ${m.date} às ${m.time} (📍 ${m.location})</span>
+            ${m.hasGoalMismatch ? `<span class="badge-warning">⚠️ Golos Incompletos</span>` : ''}
+          </div>
           <button onclick="openModal(${m.id})" class="btn-edit">✏️ Editar Jogo</button>
         </div>
         <div style="display:flex; justify-content:space-between; font-weight:bold;">
