@@ -88,6 +88,7 @@
 
     .btn-excel { background: var(--excel); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
+    .btn-recover { background: #0284c7; color: #fff; }
     .btn-edit { background: var(--gold); color: #0f172a; padding: 4px 8px; font-size: 12px; width: auto; }
 
     .player-row {
@@ -176,6 +177,18 @@
       font-weight: bold;
     }
 
+    .pending-alert {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid #f59e0b;
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .pending-alert.ok {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid var(--accent);
+    }
+
     .modal {
       display: none;
       position: fixed;
@@ -209,6 +222,9 @@
     </div>
     <span id="syncStatus" class="status-badge">🔄 A Ligar à Nuvem...</span>
   </div>
+
+  <!-- RESUMO DE GOLOS PENDENTES (LOGO NO TOPO) -->
+  <div id="pendingGoalsSummary"></div>
 
   <!-- 1. JOGADORES -->
   <div class="card">
@@ -285,6 +301,7 @@
 
   <!-- AÇÕES DE DADOS -->
   <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+    <button onclick="recoverLocalStorage()" class="btn-recover" style="width: auto; padding: 8px 12px;">🔄 Recuperar Dados Locais</button>
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
   </div>
 
@@ -418,6 +435,9 @@
       if (cloudPlayers.length > 0 || cloudMatches.length > 0) {
         window.players = cloudPlayers;
         window.matches = cloudMatches;
+        saveLocalBackup();
+      } else if (window.players.length === 0 && cloudPlayers.length === 0) {
+        loadLocalBackup();
       }
 
       statusEl.innerText = "🟢 Sincronizado (Nuvem)";
@@ -434,8 +454,36 @@
     statusEl.style.color = "#ef4444";
   });
 
+  window.saveLocalBackup = function() {
+    if (window.players && window.players.length > 0) {
+      localStorage.setItem('futsal_backup_players', JSON.stringify(window.players));
+      localStorage.setItem('futsal_backup_matches', JSON.stringify(window.matches));
+    }
+  };
+
+  window.loadLocalBackup = function() {
+    const localP = JSON.parse(localStorage.getItem('futsal_backup_players')) || [];
+    const localM = JSON.parse(localStorage.getItem('futsal_backup_matches')) || [];
+    if (localP.length > 0) {
+      window.players = localP;
+      window.matches = localM;
+    }
+  };
+
+  window.recoverLocalStorage = function() {
+    loadLocalBackup();
+    if (window.players.length > 0) {
+      saveCloudStorage();
+      render();
+      alert("Dados locais recuperados com sucesso para a nuvem!");
+    } else {
+      alert("Não existem dados guardados na memória deste dispositivo.");
+    }
+  };
+
   window.saveCloudStorage = async function() {
     if (!window.players || window.players.length === 0) return;
+    saveLocalBackup();
     try {
       await setDoc(docRef, {
         players: window.players,
@@ -509,7 +557,6 @@
     const name = input.value.trim();
     if (!name) return;
 
-    // Validação de nomes duplicados (insensível a maiúsculas/minúsculas)
     const exists = players.some(p => p.name.toLowerCase() === name.toLowerCase());
     if (exists) {
       alert("Já existe um jogador com esse nome, por favor, verifique/corrija o nome");
@@ -799,6 +846,54 @@
     `).join('');
   }
 
+  function renderPendingGoalsSummary() {
+    const summaryContainer = document.getElementById('pendingGoalsSummary');
+    if (!matches || matches.length === 0) {
+      summaryContainer.innerHTML = '';
+      return;
+    }
+
+    let totalMissingGoals = 0;
+    let detailsList = [];
+
+    matches.forEach(m => {
+      if (m.hasGoalMismatch && m.teamAData && m.teamBData) {
+        const goalsA = m.teamAData.reduce((sum, p) => sum + (p.matchGoals || 0), 0);
+        const ownGoalsA = m.teamAData.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+        const goalsB = m.teamBData.reduce((sum, p) => sum + (p.matchGoals || 0), 0);
+        const ownGoalsB = m.teamBData.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+
+        const calcA = goalsA + ownGoalsB;
+        const calcB = goalsB + ownGoalsA;
+
+        const diffA = Math.abs(m.scoreA - calcA);
+        const diffB = Math.abs(m.scoreB - calcB);
+        const matchDiff = diffA + diffB;
+
+        if (matchDiff > 0) {
+          totalMissingGoals += matchDiff;
+          detailsList.push(`• Jogo de ${m.date} (${m.location}): <strong>${matchDiff} golos</strong> em falta`);
+        }
+      }
+    });
+
+    if (totalMissingGoals > 0) {
+      summaryContainer.innerHTML = `
+        <div class="pending-alert">
+          <div style="font-weight:bold; color:#f59e0b; margin-bottom:6px; font-size:15px;">⚠️ Total de golos a atribuir: ${totalMissingGoals}</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">Desses, a distribuição detalhada por jogo é:</div>
+          <div style="font-size:13px; line-height: 1.5;">${detailsList.join('<br>')}</div>
+        </div>
+      `;
+    } else {
+      summaryContainer.innerHTML = `
+        <div class="pending-alert ok">
+          <div style="font-weight:bold; color:var(--accent); font-size:13px;">✅ Todos os golos estão perfeitamente atribuídos!</div>
+        </div>
+      `;
+    }
+  }
+
   function renderHistory() {
     const container = document.getElementById('historyList');
     if (!matches || matches.length === 0) {
@@ -1005,6 +1100,7 @@
     renderSelects();
     renderTeams();
     renderLeaderboards();
+    renderPendingGoalsSummary();
     renderHistory();
   }
 </script>
