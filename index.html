@@ -176,6 +176,19 @@
       font-weight: bold;
     }
 
+    .pending-alert {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .pending-alert.ok {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid var(--accent);
+    }
+
     .modal {
       display: none;
       position: fixed;
@@ -314,6 +327,7 @@
   <!-- HISTÓRICO -->
   <div class="card">
     <h2>4. Histórico de Jogos</h2>
+    <div id="pendingGoalsSummary" style="margin-bottom: 16px;"></div>
     <div id="historyList"></div>
   </div>
 </div>
@@ -412,13 +426,8 @@
     const statusEl = document.getElementById('syncStatus');
     if (docSnap.exists()) {
       const data = docSnap.data();
-      const cloudPlayers = data.players || [];
-      const cloudMatches = data.matches || [];
-
-      if (cloudPlayers.length > 0 || cloudMatches.length > 0) {
-        window.players = cloudPlayers;
-        window.matches = cloudMatches;
-      }
+      window.players = data.players || [];
+      window.matches = data.matches || [];
 
       statusEl.innerText = "🟢 Sincronizado (Nuvem)";
       statusEl.style.background = "rgba(16, 185, 129, 0.2)";
@@ -435,7 +444,7 @@
   });
 
   window.saveCloudStorage = async function() {
-    if (!window.players || window.players.length === 0) return;
+    if (!window.players) return;
     try {
       await setDoc(docRef, {
         players: window.players,
@@ -509,7 +518,6 @@
     const name = input.value.trim();
     if (!name) return;
 
-    // Validação de nomes duplicados (insensível a maiúsculas/minúsculas)
     const exists = players.some(p => p.name.toLowerCase() === name.toLowerCase());
     if (exists) {
       alert("Já existe um jogador com esse nome, por favor, verifique/corrija o nome");
@@ -799,7 +807,57 @@
     `).join('');
   }
 
+  function renderPendingGoalsSummary() {
+    const summaryContainer = document.getElementById('pendingGoalsSummary');
+    if (!matches || matches.length === 0) {
+      summaryContainer.innerHTML = '';
+      return;
+    }
+
+    let totalMissingGoals = 0;
+    let detailsList = [];
+
+    matches.forEach(m => {
+      if (m.hasGoalMismatch && m.teamAData && m.teamBData) {
+        const goalsA = m.teamAData.reduce((sum, p) => sum + (p.matchGoals || 0), 0);
+        const ownGoalsA = m.teamAData.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+        const goalsB = m.teamBData.reduce((sum, p) => sum + (p.matchGoals || 0), 0);
+        const ownGoalsB = m.teamBData.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+
+        const calcA = goalsA + ownGoalsB;
+        const calcB = goalsB + ownGoalsA;
+
+        // Diferença absoluta em falta para bater certo com o resultado global
+        const diffA = Math.abs(m.scoreA - calcA);
+        const diffB = Math.abs(m.scoreB - calcB);
+        const matchDiff = diffA + diffB;
+
+        if (matchDiff > 0) {
+          totalMissingGoals += matchDiff;
+          detailsList.push(`• Jogo de ${m.date} (${m.location}): <strong>${matchDiff} golos</strong> em falta`);
+        }
+      }
+    });
+
+    if (totalMissingGoals > 0) {
+      summaryContainer.innerHTML = `
+        <div class="pending-alert">
+          <div style="font-weight:bold; color:#f59e0b; margin-bottom:6px;">⚠️ Total de golos a atribuir: ${totalMissingGoals}</div>
+          <div style="font-size:12px; color:var(--text-muted);">Desses, a distribuição detalhada por jogo é:</div>
+          <div style="font-size:12px; margin-top:4px;">${detailsList.join('<br>')}</div>
+        </div>
+      `;
+    } else {
+      summaryContainer.innerHTML = `
+        <div class="pending-alert ok">
+          <div style="font-weight:bold; color:var(--accent); font-size:12px;">✅ Todos os golos estão perfeitamente atribuídos!</div>
+        </div>
+      `;
+    }
+  }
+
   function renderHistory() {
+    renderPendingGoalsSummary();
     const container = document.getElementById('historyList');
     if (!matches || matches.length === 0) {
       container.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">Nenhum jogo registado.</span>`;
@@ -987,27 +1045,4 @@
     });
 
     loadScript.then(() => {
-      const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0) || (b.goals || 0) - (a.goals || 0));
-      const data = sorted.map((i, p) => ({
-        "Posição": `${p + 1}º`, "Jogador": i.name, "Pontos": i.points || 0,
-        "Golos Marcados": i.goals || 0, "Auto-Golos": i.ownGoals || 0, "Jogos": i.played || 0, "Vitórias": i.wins || 0, "Empates": i.draws || 0, "Derrotas": i.losses || 0
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Classificação");
-      XLSX.writeFile(wb, "Futsal_Classificacao.xlsx");
-    });
-  }
-
-  function render() {
-    renderRegisteredPlayers();
-    renderSelects();
-    renderTeams();
-    renderLeaderboards();
-    renderHistory();
-  }
-</script>
-
-</body>
-</html>
+      const sorted = [...players].sort((a, b) => (b.
