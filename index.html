@@ -285,7 +285,6 @@
 
   <!-- AÇÕES DE DADOS -->
   <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
-    <button onclick="recoverLocalData()" style="width: auto; padding: 8px 12px; background: #0284c7; color:#fff;">🔄 Recuperar Dados Locais</button>
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
     <button onclick="resetData()" class="btn-danger" style="width: auto; padding: 8px 12px; font-size:12px;">Limpar Tudo</button>
   </div>
@@ -431,19 +430,6 @@
     statusEl.style.color = "#ef4444";
   });
 
-  window.recoverLocalData = function() {
-    const localP = JSON.parse(localStorage.getItem('futsal_players_v2')) || [];
-    const localM = JSON.parse(localStorage.getItem('futsal_matches_v2')) || [];
-    if (localP.length > 0 || localM.length > 0) {
-      window.players = localP;
-      window.matches = localM;
-      saveCloudStorage();
-      alert("Dados locais recuperados e enviados para a nuvem com sucesso!");
-    } else {
-      alert("Nenhum dado local encontrado neste navegador.");
-    }
-  };
-
   window.saveCloudStorage = async function() {
     try {
       await setDoc(docRef, {
@@ -536,7 +522,6 @@
     const newName = prompt("Alterar nome do jogador:", p.name);
     if (newName && newName.trim() !== "") {
       p.name = newName.trim();
-      recalculateGlobalStats();
       saveCloudStorage();
       render();
     }
@@ -550,7 +535,6 @@
       players = players.filter(x => x.id !== id);
       teamA = teamA.filter(x => x.id !== id);
       teamB = teamB.filter(x => x.id !== id);
-      recalculateGlobalStats();
       saveCloudStorage();
       render();
     }
@@ -729,6 +713,35 @@
     const capA = teamA.find(p => p.isCaptain)?.name || 'N/A';
     const capB = teamB.find(p => p.isCaptain)?.name || 'N/A';
 
+    let pA = 1, pB = 1, resA = 'loss', resB = 'loss';
+    if (sA > sB) { pA = 4; pB = 1; resA = 'win'; resB = 'loss'; }
+    else if (sB > sA) { pA = 1; pB = 4; resA = 'loss'; resB = 'win'; }
+    else { pA = 2; pB = 2; resA = 'draw'; resB = 'draw'; }
+
+    // Atualização direta das estatísticas dos jogadores
+    players.forEach(p => {
+      const inA = teamA.find(x => x.id === p.id);
+      const inB = teamB.find(x => x.id === p.id);
+
+      if (inA) {
+        p.points = (p.points || 0) + pA;
+        p.goals = (p.goals || 0) + (inA.matchGoals || 0);
+        p.ownGoals = (p.ownGoals || 0) + (inA.ownGoals || 0);
+        p.played = (p.played || 0) + 1;
+        if (resA === 'win') p.wins = (p.wins || 0) + 1;
+        else if (resA === 'draw') p.draws = (p.draws || 0) + 1;
+        else p.losses = (p.losses || 0) + 1;
+      } else if (inB) {
+        p.points = (p.points || 0) + pB;
+        p.goals = (p.goals || 0) + (inB.matchGoals || 0);
+        p.ownGoals = (p.ownGoals || 0) + (inB.ownGoals || 0);
+        p.played = (p.played || 0) + 1;
+        if (resB === 'win') p.wins = (p.wins || 0) + 1;
+        else if (resB === 'draw') p.draws = (p.draws || 0) + 1;
+        else p.losses = (p.losses || 0) + 1;
+      }
+    });
+
     matches.unshift({
       id: Date.now(), date, time, location, scoreA: sA, scoreB: sB,
       capA, capB, story, photo: photoBase64, audio: currentAudioMain,
@@ -736,8 +749,6 @@
       teamAData: [...teamA],
       teamBData: [...teamB]
     });
-
-    recalculateGlobalStats();
 
     teamA = []; teamB = []; currentAudioMain = "";
     document.getElementById('scoreA').value = 0;
@@ -751,79 +762,27 @@
     alert("Jogo gravado e sincronizado com sucesso!");
   }
 
-  function recalculateGlobalStats() {
-    let hasDetailedMatches = matches.some(m => m.teamAData && m.teamAData.length > 0);
-
-    if (hasDetailedMatches) {
-      players.forEach(p => {
-        p.points = 0;
-        p.goals = 0;
-        p.ownGoals = 0;
-        p.played = 0;
-        p.wins = 0;
-        p.draws = 0;
-        p.losses = 0;
-      });
-
-      matches.forEach(m => {
-        const sA = m.scoreA;
-        const sB = m.scoreB;
-
-        let pA = 1, pB = 1, resA = 'loss', resB = 'loss';
-        if (sA > sB) { pA = 4; pB = 1; resA = 'win'; resB = 'loss'; }
-        else if (sB > sA) { pA = 1; pB = 4; resA = 'loss'; resB = 'win'; }
-        else { pA = 2; pB = 2; resA = 'draw'; resB = 'draw'; }
-
-        if (m.teamAData) {
-          m.teamAData.forEach(pInMatch => {
-            const mainP = players.find(x => x.id === pInMatch.id || x.name === pInMatch.name);
-            if (mainP) {
-              mainP.points += pA;
-              mainP.goals += (pInMatch.matchGoals || 0);
-              mainP.ownGoals += (pInMatch.ownGoals || 0);
-              mainP.played++;
-              if (resA === 'win') mainP.wins++; else if (resA === 'draw') mainP.draws++; else mainP.losses++;
-            }
-          });
-        }
-
-        if (m.teamBData) {
-          m.teamBData.forEach(pInMatch => {
-            const mainP = players.find(x => x.id === pInMatch.id || x.name === pInMatch.name);
-            if (mainP) {
-              mainP.points += pB;
-              mainP.goals += (pInMatch.matchGoals || 0);
-              mainP.ownGoals += (pInMatch.ownGoals || 0);
-              mainP.played++;
-              if (resB === 'win') mainP.wins++; else if (resB === 'draw') mainP.draws++; else mainP.losses++;
-            }
-          });
-        }
-      });
-    }
-  }
-
   function renderLeaderboards() {
     if (!players) return;
-    const sortedPts = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
+    const sortedPts = [...players].sort((a, b) => (b.points || 0) - (a.points || 0) || (b.goals || 0) - (a.goals || 0));
     document.getElementById('leaderboardPoints').innerHTML = sortedPts.map((p, i) => `
       <tr>
         <td><strong>${i + 1}º</strong></td>
         <td>${p.name}</td>
-        <td style="color:var(--gold); font-weight:bold;">${p.points}</td>
-        <td>${p.played}</td>
-        <td>${p.wins}</td>
+        <td style="color:var(--gold); font-weight:bold;">${p.points || 0}</td>
+        <td>${p.played || 0}</td>
+        <td>${p.wins || 0}</td>
       </tr>
     `).join('');
 
-    const sortedGls = [...players].sort((a, b) => b.goals - a.goals || (a.ownGoals || 0) - (b.ownGoals || 0));
+    const sortedGls = [...players].sort((a, b) => (b.goals || 0) - (a.goals || 0) || (a.ownGoals || 0) - (b.ownGoals || 0));
     document.getElementById('leaderboardGoals').innerHTML = sortedGls.map((p, i) => `
       <tr>
         <td><strong>${i + 1}º</strong></td>
         <td>${p.name}</td>
-        <td style="color:var(--accent); font-weight:bold;">${p.goals}</td>
+        <td style="color:var(--accent); font-weight:bold;">${p.goals || 0}</td>
         <td style="color:#ef4444;">${p.ownGoals || 0}</td>
-        <td>${p.played}</td>
+        <td>${p.played || 0}</td>
       </tr>
     `).join('');
   }
@@ -845,9 +804,9 @@
           <button onclick="openModal(${m.id})" class="btn-edit">✏️ Editar Jogo</button>
         </div>
         <div style="display:flex; justify-content:space-between; font-weight:bold;">
-          <span style="color:#60a5fa;">Eq. A (${m.scoreA}) <small>👑 ${m.capA}</small></span>
+          <span style="color:#60a5fa;">Eq. A (${m.scoreA}) <small>👑 ${m.capA || 'N/A'}</small></span>
           <span>vs</span>
-          <span style="color:#f87171;">Eq. B (${m.scoreB}) <small>👑 ${m.capB}</small></span>
+          <span style="color:#f87171;">Eq. B (${m.scoreB}) <small>👑 ${m.capB || 'N/A'}</small></span>
         </div>
         ${m.story ? `<div style="margin-top:6px; font-style:italic; font-size:12px; color:#cbd5e1;">"${m.story}"</div>` : ''}
         ${m.audio ? `<audio controls src="${m.audio}" style="width:100%; margin-top:8px;"></audio>` : ''}
@@ -998,11 +957,10 @@
       m.photo = await compressImage(photoInput.files[0]);
     }
 
-    recalculateGlobalStats();
     saveCloudStorage();
     render();
     closeModal();
-    alert("Jogo atualizado e estatísticas recalculadas na nuvem!");
+    alert("Jogo atualizado e guardado na nuvem!");
   }
 
   function exportToExcel() {
@@ -1017,10 +975,10 @@
     });
 
     loadScript.then(() => {
-      const sorted = [...players].sort((a, b) => b.points - a.points || b.goals - a.goals);
+      const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0) || (b.goals || 0) - (a.goals || 0));
       const data = sorted.map((i, p) => ({
-        "Posição": `${p + 1}º`, "Jogador": i.name, "Pontos": i.points,
-        "Golos Marcados": i.goals, "Auto-Golos": i.ownGoals || 0, "Jogos": i.played, "Vitórias": i.wins, "Empates": i.draws, "Derrotas": i.losses
+        "Posição": `${p + 1}º`, "Jogador": i.name, "Pontos": i.points || 0,
+        "Golos Marcados": i.goals || 0, "Auto-Golos": i.ownGoals || 0, "Jogos": i.played || 0, "Vitórias": i.wins || 0, "Empates": i.draws || 0, "Derrotas": i.losses || 0
       }));
 
       const ws = XLSX.utils.json_to_sheet(data);
