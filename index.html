@@ -283,11 +283,9 @@
     <button onclick="saveMatch()" style="margin-top: 12px; padding: 12px;">Gravar Jogo e Sincronizar</button>
   </div>
 
-  <!-- AÇÕES DE DADOS (BOTÃO DE RECUPERAÇÃO INCLUÍDO) -->
+  <!-- AÇÕES DE DADOS -->
   <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
-    <button onclick="recoverLocalData()" style="width: auto; padding: 8px 12px; background: #0284c7; color:#fff;">🔄 Recuperar Dados Locais</button>
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
-    <button onclick="resetData()" class="btn-danger" style="width: auto; padding: 8px 12px; font-size:12px;">Limpar Tudo</button>
   </div>
 
   <!-- TABELAS -->
@@ -320,7 +318,7 @@
   </div>
 </div>
 
-<!-- MODAL EDITAR JOGO COMPLETO -->
+<!-- MODAL EDITAR JOGO -->
 <div id="editModal" class="modal">
   <div class="modal-content">
     <h2>✏️ Editar Informações do Jogo</h2>
@@ -410,13 +408,20 @@
 
   document.getElementById('matchDate').valueAsDate = new Date();
 
+  // Escuta em tempo real com proteção contra dados vazios da nuvem
   onSnapshot(docRef, (docSnap) => {
     const statusEl = document.getElementById('syncStatus');
     if (docSnap.exists()) {
       const data = docSnap.data();
-      window.players = data.players || [];
-      window.matches = data.matches || [];
-      
+      const cloudPlayers = data.players || [];
+      const cloudMatches = data.matches || [];
+
+      // Blindagem: Se a nuvem trouxer dados válidos, atualiza o ecrã
+      if (cloudPlayers.length > 0 || cloudMatches.length > 0) {
+        window.players = cloudPlayers;
+        window.matches = cloudMatches;
+      }
+
       statusEl.innerText = "🟢 Sincronizado (Nuvem)";
       statusEl.style.background = "rgba(16, 185, 129, 0.2)";
       statusEl.style.color = "#10b981";
@@ -431,22 +436,12 @@
     statusEl.style.color = "#ef4444";
   });
 
-  window.recoverLocalData = function() {
-    let localP = JSON.parse(localStorage.getItem('futsal_players_v2')) || JSON.parse(localStorage.getItem('futsal_players')) || [];
-    let localM = JSON.parse(localStorage.getItem('futsal_matches_v2')) || JSON.parse(localStorage.getItem('futsal_matches')) || [];
-    
-    if (localP.length > 0 || localM.length > 0) {
-      window.players = localP;
-      window.matches = localM;
-      saveCloudStorage();
-      render();
-      alert("Dados locais recuperados e sincronizados com a nuvem com sucesso!");
-    } else {
-      alert("Nenhum dado local encontrado neste navegador.");
-    }
-  };
-
+  // Função de gravação na nuvem com verificação de segurança (nunca grava se estiver vazio)
   window.saveCloudStorage = async function() {
+    if (!window.players || window.players.length === 0) {
+      console.warn("Tentativa de gravação bloqueada por segurança (dados vazios).");
+      return;
+    }
     try {
       await setDoc(docRef, {
         players: window.players,
@@ -975,7 +970,7 @@
     saveCloudStorage();
     render();
     closeModal();
-    alert("Jogo atualizado e guardado na nuvem!");
+    alert("Jogo atualizado e guardado com segurança na nuvem!");
   }
 
   function exportToExcel() {
@@ -1001,14 +996,6 @@
       XLSX.utils.book_append_sheet(wb, ws, "Classificação");
       XLSX.writeFile(wb, "Futsal_Classificacao.xlsx");
     });
-  }
-
-  function resetData() {
-    if (confirm("Tens a certeza que queres apagar todos os dados na nuvem?")) {
-      players = []; matches = []; teamA = []; teamB = [];
-      saveCloudStorage();
-      render();
-    }
   }
 
   function render() {
