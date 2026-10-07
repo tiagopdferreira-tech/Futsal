@@ -283,8 +283,9 @@
     <button onclick="saveMatch()" style="margin-top: 12px; padding: 12px;">Gravar Jogo e Sincronizar</button>
   </div>
 
-  <!-- AÇÕES DE DADOS -->
+  <!-- AÇÕES DE DADOS (BOTÃO DE RECUPERAÇÃO INCLUÍDO) -->
   <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+    <button onclick="recoverLocalData()" style="width: auto; padding: 8px 12px; background: #0284c7; color:#fff;">🔄 Recuperar Dados Locais</button>
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
     <button onclick="resetData()" class="btn-danger" style="width: auto; padding: 8px 12px; font-size:12px;">Limpar Tudo</button>
   </div>
@@ -429,6 +430,21 @@
     statusEl.style.background = "rgba(239, 68, 68, 0.2)";
     statusEl.style.color = "#ef4444";
   });
+
+  window.recoverLocalData = function() {
+    let localP = JSON.parse(localStorage.getItem('futsal_players_v2')) || JSON.parse(localStorage.getItem('futsal_players')) || [];
+    let localM = JSON.parse(localStorage.getItem('futsal_matches_v2')) || JSON.parse(localStorage.getItem('futsal_matches')) || [];
+    
+    if (localP.length > 0 || localM.length > 0) {
+      window.players = localP;
+      window.matches = localM;
+      saveCloudStorage();
+      render();
+      alert("Dados locais recuperados e sincronizados com a nuvem com sucesso!");
+    } else {
+      alert("Nenhum dado local encontrado neste navegador.");
+    }
+  };
 
   window.saveCloudStorage = async function() {
     try {
@@ -718,7 +734,6 @@
     else if (sB > sA) { pA = 1; pB = 4; resA = 'loss'; resB = 'win'; }
     else { pA = 2; pB = 2; resA = 'draw'; resB = 'draw'; }
 
-    // Atualização direta das estatísticas dos jogadores
     players.forEach(p => {
       const inA = teamA.find(x => x.id === p.id);
       const inB = teamB.find(x => x.id === p.id);
