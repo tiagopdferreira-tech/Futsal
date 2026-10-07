@@ -192,7 +192,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      max-width: 550px;
+      max-width: 600px;
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
@@ -349,6 +349,20 @@
       <span>Eq. B</span>
     </div>
 
+    <!-- EDICÇÃO DE JOGADORES DO JOGO -->
+    <div class="grid-2" style="margin-bottom:12px; background:#0f172a; padding:10px; border-radius:8px; border:1px solid var(--border);">
+      <div>
+        <h4 style="color: #60a5fa; margin: 0 0 6px 0; font-size:12px;">Jogadores Equipa A</h4>
+        <select id="editSelectA" onchange="addPlayerToEditTeam('A')"><option value="">+ Jogador</option></select>
+        <div id="editListA"></div>
+      </div>
+      <div>
+        <h4 style="color: #f87171; margin: 0 0 6px 0; font-size:12px;">Jogadores Equipa B</h4>
+        <select id="editSelectB" onchange="addPlayerToEditTeam('B')"><option value="">+ Jogador</option></select>
+        <div id="editListB"></div>
+      </div>
+    </div>
+
     <label style="font-size:11px; color:var(--text-muted);">🎙️ Novo Áudio:</label>
     <div class="audio-box" style="margin-bottom:12px;">
       <div style="display:flex; gap:8px;">
@@ -392,6 +406,8 @@
   window.matches = [];
   window.teamA = [];
   window.teamB = [];
+  window.editTeamA = [];
+  window.editTeamB = [];
 
   document.getElementById('matchDate').valueAsDate = new Date();
 
@@ -536,6 +552,7 @@
     const newName = prompt("Alterar nome do jogador:", p.name);
     if (newName && newName.trim() !== "") {
       p.name = newName.trim();
+      recalculateGlobalStats();
       saveCloudStorage();
       render();
     }
@@ -549,6 +566,7 @@
       players = players.filter(x => x.id !== id);
       teamA = teamA.filter(x => x.id !== id);
       teamB = teamB.filter(x => x.id !== id);
+      recalculateGlobalStats();
       saveCloudStorage();
       render();
     }
@@ -700,7 +718,6 @@
     if (!date) return alert("Indica a data do jogo.");
     if (teamA.length === 0 || teamB.length === 0) return alert("Adiciona jogadores a ambas as equipas.");
 
-    // Cálculo da verificação
     const goalsA = teamA.reduce((sum, p) => sum + p.matchGoals, 0);
     const ownGoalsA = teamA.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
@@ -712,13 +729,12 @@
 
     let hasMismatch = false;
 
-    // Em vez de bloquear, apenas avisa se não bater certo
     if (calcScoreA !== sA || calcScoreB !== sB) {
       hasMismatch = true;
       alert(`⚠️ AVISO DE DADOS INCOMPLETOS / DIVERGENTES:\n\n` +
             `Resultado Registado: Equipa A (${sA}) vs (${sB}) Equipa B\n` +
             `Golos Atribuídos: Equipa A (${calcScoreA}) vs (${calcScoreB}) Equipa B\n\n` +
-            `O jogo vai ser gravado na mesma, mas ficará marcado com o aviso "Golos Incompletos".`);
+            `O jogo vai ser guardado na mesma, mas ficará marcado com o aviso "Golos Incompletos".`);
     }
 
     let photoBase64 = "";
@@ -726,32 +742,18 @@
       photoBase64 = await compressImage(photoInput.files[0]);
     }
 
-    let pA = 1, pB = 1, resA = 'loss', resB = 'loss';
-    if (sA > sB) { pA = 4; pB = 1; resA = 'win'; resB = 'loss'; }
-    else if (sB > sA) { pA = 1; pB = 4; resA = 'loss'; resB = 'win'; }
-    else { pA = 2; pB = 2; resA = 'draw'; resB = 'draw'; }
-
     const capA = teamA.find(p => p.isCaptain)?.name || 'N/A';
     const capB = teamB.find(p => p.isCaptain)?.name || 'N/A';
 
     matches.unshift({
       id: Date.now(), date, time, location, scoreA: sA, scoreB: sB,
       capA, capB, story, photo: photoBase64, audio: currentAudioMain,
-      hasGoalMismatch: hasMismatch
+      hasGoalMismatch: hasMismatch,
+      teamAData: [...teamA],
+      teamBData: [...teamB]
     });
 
-    players.forEach(p => {
-      const inA = teamA.find(x => x.id === p.id);
-      const inB = teamB.find(x => x.id === p.id);
-
-      if (inA) {
-        p.points += pA; p.goals += inA.matchGoals; p.ownGoals = (p.ownGoals || 0) + (inA.ownGoals || 0); p.played++;
-        if (resA === 'win') p.wins++; else if (resA === 'draw') p.draws++; else p.losses++;
-      } else if (inB) {
-        p.points += pB; p.goals += inB.matchGoals; p.ownGoals = (p.ownGoals || 0) + (inB.ownGoals || 0); p.played++;
-        if (resB === 'win') p.wins++; else if (resB === 'draw') p.draws++; else p.losses++;
-      }
-    });
+    recalculateGlobalStats();
 
     teamA = []; teamB = []; currentAudioMain = "";
     document.getElementById('scoreA').value = 0;
@@ -763,6 +765,55 @@
     saveCloudStorage();
     render();
     alert("Jogo gravado e sincronizado com sucesso!");
+  }
+
+  /* Recalcular todas as estatísticas globais com base no histórico completo de jogos */
+  function recalculateGlobalStats() {
+    players.forEach(p => {
+      p.points = 0;
+      p.goals = 0;
+      p.ownGoals = 0;
+      p.played = 0;
+      p.wins = 0;
+      p.draws = 0;
+      p.losses = 0;
+    });
+
+    matches.forEach(m => {
+      const sA = m.scoreA;
+      const sB = m.scoreB;
+
+      let pA = 1, pB = 1, resA = 'loss', resB = 'loss';
+      if (sA > sB) { pA = 4; pB = 1; resA = 'win'; resB = 'loss'; }
+      else if (sB > sA) { pA = 1; pB = 4; resA = 'loss'; resB = 'win'; }
+      else { pA = 2; pB = 2; resA = 'draw'; resB = 'draw'; }
+
+      if (m.teamAData) {
+        m.teamAData.forEach(pInMatch => {
+          const mainP = players.find(x => x.id === pInMatch.id || x.name === pInMatch.name);
+          if (mainP) {
+            mainP.points += pA;
+            mainP.goals += (pInMatch.matchGoals || 0);
+            mainP.ownGoals += (pInMatch.ownGoals || 0);
+            mainP.played++;
+            if (resA === 'win') mainP.wins++; else if (resA === 'draw') mainP.draws++; else mainP.losses++;
+          }
+        });
+      }
+
+      if (m.teamBData) {
+        m.teamBData.forEach(pInMatch => {
+          const mainP = players.find(x => x.id === pInMatch.id || x.name === pInMatch.name);
+          if (mainP) {
+            mainP.points += pB;
+            mainP.goals += (pInMatch.matchGoals || 0);
+            mainP.ownGoals += (pInMatch.ownGoals || 0);
+            mainP.played++;
+            if (resB === 'win') mainP.wins++; else if (resB === 'draw') mainP.draws++; else mainP.losses++;
+          }
+        });
+      }
+    });
   }
 
   function renderLeaderboards() {
@@ -818,6 +869,7 @@
     `).join('');
   }
 
+  /* MODAL DE EDIÇÃO DE JOGO (Com Edição de Jogadores) */
   function openModal(id) {
     const m = matches.find(x => x.id === id);
     if (!m) return;
@@ -830,6 +882,11 @@
     document.getElementById('editScoreB').value = m.scoreB;
     document.getElementById('editStory').value = m.story || '';
 
+    editTeamA = m.teamAData ? JSON.parse(JSON.stringify(m.teamAData)) : [];
+    editTeamB = m.teamBData ? JSON.parse(JSON.stringify(m.teamBData)) : [];
+
+    renderEditModalTeams();
+
     currentAudioEdit = m.audio || '';
     const preview = document.getElementById('audioPreviewEdit');
     if (m.audio) {
@@ -840,6 +897,79 @@
     }
 
     document.getElementById('editModal').style.display = 'flex';
+  }
+
+  function renderEditModalTeams() {
+    const selA = document.getElementById('editSelectA');
+    const selB = document.getElementById('editSelectB');
+    selA.innerHTML = '<option value="">+ Jogador</option>';
+    selB.innerHTML = '<option value="">+ Jogador</option>';
+
+    players.forEach(p => {
+      const inA = editTeamA.some(t => t.id === p.id || t.name === p.name);
+      const inB = editTeamB.some(t => t.id === p.id || t.name === p.name);
+      if (!inA && !inB) {
+        selA.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+        selB.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      }
+    });
+
+    document.getElementById('editListA').innerHTML = editTeamA.map(p => `
+      <div class="player-row">
+        <span style="font-size:12px;">${p.name}</span>
+        <div class="player-controls">
+          <label style="font-size:10px; color:var(--text-muted);">G:</label>
+          <input type="number" min="0" value="${p.matchGoals || 0}" onchange="updateEditGoals('A', ${p.id}, this.value)">
+          <label style="font-size:10px; color:#ef4444;">AG:</label>
+          <input type="number" min="0" value="${p.ownGoals || 0}" onchange="updateEditOwnGoals('A', ${p.id}, this.value)">
+          <button onclick="removeEditPlayer('A', ${p.id})" class="btn-danger" style="width:auto; padding:2px 4px; font-size:10px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('editListB').innerHTML = editTeamB.map(p => `
+      <div class="player-row">
+        <span style="font-size:12px;">${p.name}</span>
+        <div class="player-controls">
+          <label style="font-size:10px; color:var(--text-muted);">G:</label>
+          <input type="number" min="0" value="${p.matchGoals || 0}" onchange="updateEditGoals('B', ${p.id}, this.value)">
+          <label style="font-size:10px; color:#ef4444;">AG:</label>
+          <input type="number" min="0" value="${p.ownGoals || 0}" onchange="updateEditOwnGoals('B', ${p.id}, this.value)">
+          <button onclick="removeEditPlayer('B', ${p.id})" class="btn-danger" style="width:auto; padding:2px 4px; font-size:10px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function addPlayerToEditTeam(team) {
+    const select = document.getElementById(team === 'A' ? 'editSelectA' : 'editSelectB');
+    const id = Number(select.value);
+    if (!id) return;
+
+    const p = players.find(x => x.id === id);
+    if (team === 'A') editTeamA.push({ ...p, matchGoals: 0, ownGoals: 0 });
+    if (team === 'B') editTeamB.push({ ...p, matchGoals: 0, ownGoals: 0 });
+
+    select.value = '';
+    renderEditModalTeams();
+  }
+
+  function removeEditPlayer(team, id) {
+    if (team === 'A') editTeamA = editTeamA.filter(p => p.id !== id);
+    if (team === 'B') editTeamB = editTeamB.filter(p => p.id !== id);
+    renderEditModalTeams();
+  }
+
+  function updateEditGoals(team, id, val) {
+    const list = team === 'A' ? editTeamA : editTeamB;
+    const p = list.find(x => x.id === id);
+    if (p) p.matchGoals = Number(val);
+  }
+
+  function updateEditOwnGoals(team, id, val) {
+    const list = team === 'A' ? editTeamA : editTeamB;
+    const p = list.find(x => x.id === id);
+    if (p) p.ownGoals = Number(val);
   }
 
   function closeModal() {
@@ -859,15 +989,35 @@
     m.story = document.getElementById('editStory').value.trim();
     if (currentAudioEdit) m.audio = currentAudioEdit;
 
+    m.teamAData = [...editTeamA];
+    m.teamBData = [...editTeamB];
+
+    // Verificar se com a edição os golos passaram a bater certo
+    const goalsA = editTeamA.reduce((sum, p) => sum + (p.matchGoals || 0), 0);
+    const ownGoalsA = editTeamA.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+
+    const goalsB = editTeamB.reduce((sum, p) => sum + (p.matchGoals || 0), 0);
+    const ownGoalsB = editTeamB.reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+
+    const calcScoreA = goalsA + ownGoalsB;
+    const calcScoreB = goalsB + ownGoalsA;
+
+    if (calcScoreA === m.scoreA && calcScoreB === m.scoreB) {
+      m.hasGoalMismatch = false;
+    } else {
+      m.hasGoalMismatch = true;
+    }
+
     const photoInput = document.getElementById('editPhoto');
     if (photoInput.files && photoInput.files[0]) {
       m.photo = await compressImage(photoInput.files[0]);
     }
 
+    recalculateGlobalStats();
     saveCloudStorage();
     render();
     closeModal();
-    alert("Jogo atualizado e sincronizado com a nuvem!");
+    alert("Jogo atualizado e estatísticas recalculadas na nuvem!");
   }
 
   function exportToExcel() {
