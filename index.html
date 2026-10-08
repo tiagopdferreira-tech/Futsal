@@ -88,7 +88,6 @@
 
     .btn-excel { background: var(--excel); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
-    .btn-recover { background: #0284c7; color: #fff; }
     .btn-edit { background: var(--gold); color: #0f172a; padding: 4px 8px; font-size: 12px; width: auto; }
 
     .player-row {
@@ -301,7 +300,6 @@
 
   <!-- AÇÕES DE DADOS -->
   <div style="display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
-    <button onclick="recoverLocalStorage()" class="btn-recover" style="width: auto; padding: 8px 12px;">🔄 Recuperar Dados Locais</button>
     <button onclick="exportToExcel()" class="btn-excel" style="width: auto; padding: 8px 12px;">📥 Exportar Excel</button>
   </div>
 
@@ -425,6 +423,7 @@
 
   document.getElementById('matchDate').valueAsDate = new Date();
 
+  // Sincronização automática blindada (nunca sobrescreve com vazio)
   onSnapshot(docRef, (docSnap) => {
     const statusEl = document.getElementById('syncStatus');
     if (docSnap.exists()) {
@@ -435,9 +434,6 @@
       if (cloudPlayers.length > 0 || cloudMatches.length > 0) {
         window.players = cloudPlayers;
         window.matches = cloudMatches;
-        saveLocalBackup();
-      } else if (window.players.length === 0 && cloudPlayers.length === 0) {
-        loadLocalBackup();
       }
 
       statusEl.innerText = "🟢 Sincronizado (Nuvem)";
@@ -454,36 +450,8 @@
     statusEl.style.color = "#ef4444";
   });
 
-  window.saveLocalBackup = function() {
-    if (window.players && window.players.length > 0) {
-      localStorage.setItem('futsal_backup_players', JSON.stringify(window.players));
-      localStorage.setItem('futsal_backup_matches', JSON.stringify(window.matches));
-    }
-  };
-
-  window.loadLocalBackup = function() {
-    const localP = JSON.parse(localStorage.getItem('futsal_backup_players')) || [];
-    const localM = JSON.parse(localStorage.getItem('futsal_backup_matches')) || [];
-    if (localP.length > 0) {
-      window.players = localP;
-      window.matches = localM;
-    }
-  };
-
-  window.recoverLocalStorage = function() {
-    loadLocalBackup();
-    if (window.players.length > 0) {
-      saveCloudStorage();
-      render();
-      alert("Dados locais recuperados com sucesso para a nuvem!");
-    } else {
-      alert("Não existem dados guardados na memória deste dispositivo.");
-    }
-  };
-
   window.saveCloudStorage = async function() {
     if (!window.players || window.players.length === 0) return;
-    saveLocalBackup();
     try {
       await setDoc(docRef, {
         players: window.players,
